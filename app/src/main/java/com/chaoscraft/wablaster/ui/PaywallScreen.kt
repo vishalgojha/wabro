@@ -145,7 +145,7 @@ fun PaywallScreen(onUnlocked: () -> Unit) {
                 )
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    text = "One-time payment for lifetime access",
+                    text = "One-time payment",
                     style = MaterialTheme.typography.bodyMedium,
                     textAlign = TextAlign.Center
                 )
@@ -208,10 +208,18 @@ fun PaywallScreen(onUnlocked: () -> Unit) {
         }
 
         Text(
-            text = "1. Pay \u20B9${PaymentConfig.paymentAmount} to the UPI ID above\n2. Tap \"I've Paid\" below to unlock",
+            text = "1. Pay \u20B9${PaymentConfig.paymentAmount} to the UPI ID above\n2. Send screenshot to +91 9820056180 to activate",
             style = MaterialTheme.typography.bodyMedium,
             textAlign = TextAlign.Center,
             color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+
+        Text(
+            text = "OR\n3. Use 3-day free trial (no payment needed)",
+            style = MaterialTheme.typography.bodyMedium,
+            textAlign = TextAlign.Center,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 8.dp)
         )
 
         Button(
@@ -323,6 +331,12 @@ fun PaywallScreen(onUnlocked: () -> Unit) {
                         Spacer(Modifier.height(8.dp))
                         Text(
                             text = "Tap the number above to open WhatsApp",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(Modifier.height(12.dp))
+                        Text(
+                            text = "Or use 3-day free trial (no payment needed)",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
