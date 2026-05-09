@@ -17,13 +17,12 @@
 
         /* Hero */
         .hero {
-            min-height: 70vh;
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
             text-align: center;
-            padding: 60px 0;
+            padding: 80px 0 60px;
         }
         .hero h1 {
             font-size: clamp(2.5rem, 6vw, 4rem);
@@ -51,19 +50,19 @@
         .btn-outline:hover { background: #25D36622; }
 
         /* Features */
-        .features { padding: 64px 0; }
+        .features { padding: 40px 0; }
         .features h2 {
-            text-align: center; font-size: 1.8rem; margin-bottom: 36px;
+            text-align: center; font-size: 1.6rem; margin-bottom: 24px;
         }
-        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
         .card {
-            background: #1a1a1a; border-radius: 14px; padding: 24px 20px;
+            background: #1a1a1a; border-radius: 12px; padding: 20px;
             border: 1px solid #2a2a2a; transition: .2s;
         }
-        .card:hover { border-color: #25D366; transform: translateY(-3px); }
-        .card .icon { font-size: 1.6rem; margin-bottom: 8px; }
-        .card h3 { font-size: 1rem; margin-bottom: 6px; color: #25D366; }
-        .card p { font-size: .85rem; color: #b0b8c1; }
+        .card:hover { border-color: #25D366; transform: translateY(-2px); }
+        .card .icon { font-size: 1.4rem; margin-bottom: 6px; }
+        .card h3 { font-size: .95rem; margin-bottom: 4px; color: #25D366; }
+        .card p { font-size: .82rem; color: #b0b8c1; }
 
         /* Partnership / PropAI */
         .partnership {
@@ -93,19 +92,20 @@
 
         /* Footer */
         footer {
-            text-align: center; padding: 32px 0;
-            border-top: 1px solid #2a2a2a; margin-top: 48px;
-            color: #54656f; font-size: .8rem;
+            text-align: center; padding: 24px 0;
+            border-top: 1px solid #2a2a2a; margin-top: 32px;
+            color: #54656f; font-size: .78rem;
         }
         footer a { color: #25D366; text-decoration: none; }
 
         @media (max-width: 600px) {
-            .hero { min-height: 50vh; padding: 40px 0; }
+            .hero { padding: 60px 0 40px; }
             .hero-buttons { flex-direction: column; align-items: stretch; }
             .btn { justify-content: center; }
-            .features { padding: 40px 0; }
+            .features { padding: 32px 0; }
+            .features h2 { margin-bottom: 20px; }
             .steps { padding: 32px 0; }
-            footer { margin-top: 32px; padding: 24px 0; }
+            footer { margin-top: 24px; padding: 20px 0; }
         }
     </style>
 </head>
