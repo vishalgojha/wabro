@@ -59,4 +59,13 @@ class CrashLogger(private val context: Context) {
             ?.take(limit)
             ?.map { it.name } ?: emptyList()
     }
+
+    fun getLogContent(filename: String): String? {
+        val file = File(logDir, filename)
+        return if (file.exists()) file.readText() else null
+    }
+
+    fun deleteAllLogs(): Boolean {
+        return logDir.listFiles()?.all { it.delete() } ?: true
+    }
 }

@@ -1,11 +1,14 @@
 package com.chaoscraft.wablaster.ui
 
+import android.Manifest
 import android.content.Intent
 import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import android.view.ViewGroup
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.compose.foundation.layout.*
@@ -22,6 +25,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import com.chaoscraft.wablaster.util.AiConfig
 import com.chaoscraft.wablaster.util.AppValidator
+import com.chaoscraft.wablaster.util.CrashLogger
 import com.chaoscraft.wablaster.util.PaymentManager
 import com.chaoscraft.wablaster.util.SenderConfig
 import java.text.SimpleDateFormat
@@ -38,6 +42,11 @@ fun SettingsScreen(
     val context = LocalContext.current
     var showSenderPicker by remember { mutableStateOf(false) }
     var showLandingPage by remember { mutableStateOf(false) }
+    var showCrashLogs by remember { mutableStateOf(false) }
+
+    val notificationPermLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { }
 
     Column(
         modifier = Modifier.fillMaxSize().padding(16.dp),
@@ -133,22 +142,28 @@ fun SettingsScreen(
             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("Permissions", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
 
-                val checks = listOf(
-                    Triple("Accessibility Service", validator.isAccessibilityServiceEnabled()) {
+                val notifGranted = validator.isNotificationPermissionGranted()
+                val checks = buildList {
+                    add(Triple("Accessibility Service", validator.isAccessibilityServiceEnabled()) {
                         context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
-                    },
-                    Triple("Battery Optimization", validator.isBatteryOptimizationIgnored()) {
+                    })
+                    add(Triple("Battery Optimization", validator.isBatteryOptimizationIgnored()) {
                         val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
                             data = Uri.parse("package:${context.packageName}")
                         }
                         context.startActivity(intent)
-                    },
-                    Triple("Draw Over Other Apps", validator.canDrawOverlays()) {
+                    })
+                    add(Triple("Draw Over Other Apps", validator.canDrawOverlays()) {
                         context.startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION).apply {
                             data = Uri.parse("package:${context.packageName}")
                         })
+                    })
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        add(Triple("Notifications", notifGranted) {
+                            notificationPermLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                        })
                     }
-                )
+                }
 
                 checks.forEachIndexed { index, (label, enabled, action) ->
                     Row(
@@ -232,10 +247,105 @@ fun SettingsScreen(
                 }
             }
         }
+
+        // Crash Logs
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.BugReport, contentDescription = null, tint = MaterialTheme.colorScheme.error)
+                    Spacer(Modifier.width(8.dp))
+                    Text("Crash Logs", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                }
+                Spacer(Modifier.height(8.dp))
+                OutlinedButton(
+                    onClick = { showCrashLogs = true },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(Icons.Default.Description, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("View Recent Crashes")
+                }
+            }
+        }
     }
 
     if (showLandingPage) {
         LandingPageDialog(onDismiss = { showLandingPage = false })
+    }
+
+    if (showCrashLogs) {
+        val crashLogger = remember { CrashLogger(context) }
+        val logs = remember { crashLogger.getRecentLogs(10) }
+        var selectedLog by remember { mutableStateOf<String?>(null) }
+
+        if (selectedLog != null) {
+            val content = crashLogger.getLogContent(selectedLog!!) ?: "No content"
+            AlertDialog(
+                onDismissRequest = { selectedLog = null },
+                title = { Text(selectedLog!!, maxLines = 1) },
+                text = {
+                    Text(
+                        text = content,
+                        style = MaterialTheme.typography.bodySmall,
+                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                    )
+                },
+                confirmButton = {
+                    TextButton(onClick = {
+                        val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                            type = "text/plain"
+                            putExtra(Intent.EXTRA_TEXT, content)
+                        }
+                        context.startActivity(Intent.createChooser(shareIntent, "Share Crash Log"))
+                    }) { Text("Share") }
+                },
+                dismissButton = {
+                    TextButton(onClick = { selectedLog = null }) { Text("Back") }
+                }
+            )
+        } else {
+            AlertDialog(
+                onDismissRequest = { showCrashLogs = false },
+                title = { Text("Crash Logs") },
+                text = {
+                    if (logs.isEmpty()) {
+                        Text("No crash logs found", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    } else {
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            logs.forEach { filename ->
+                                TextButton(
+                                    onClick = { selectedLog = filename },
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text(
+                                        text = filename,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    Icon(
+                                        Icons.Default.ChevronRight,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    if (logs.isNotEmpty()) {
+                        TextButton(onClick = {
+                            crashLogger.deleteAllLogs()
+                            showCrashLogs = false
+                        }) { Text("Clear All") }
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showCrashLogs = false }) { Text("Close") }
+                }
+            )
+        }
     }
 }
 

@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import com.chaoscraft.wablaster.db.daos.BroadcastListContactDao
 import com.chaoscraft.wablaster.db.daos.BroadcastListDao
 import com.chaoscraft.wablaster.db.daos.CampaignDao
@@ -30,6 +32,13 @@ abstract class AppDatabase : RoomDatabase() {
     companion object {
         const val DATABASE_NAME = "wablaster.db"
 
+        val MIGRATION_1_2 = Migration(1, 2) { db ->
+            db.execSQL("CREATE TABLE IF NOT EXISTS `broadcast_lists` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `contactCount` INTEGER NOT NULL, `createdAt` INTEGER NOT NULL)")
+            db.execSQL("CREATE TABLE IF NOT EXISTS `broadcast_list_contacts` (`listId` INTEGER NOT NULL, `phone` TEXT NOT NULL, `name` TEXT NOT NULL, `locality` TEXT, `budget` TEXT, `language` TEXT, `addedAt` INTEGER NOT NULL, PRIMARY KEY(`listId`, `phone`))")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_broadcast_list_contacts_listId` ON `broadcast_list_contacts` (`listId`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_broadcast_list_contacts_phone` ON `broadcast_list_contacts` (`phone`)")
+        }
+
         @Volatile
         private var INSTANCE: AppDatabase? = null
 
@@ -40,7 +49,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     DATABASE_NAME
                 )
-                    .fallbackToDestructiveMigration()
+                    .addMigrations(MIGRATION_1_2)
                     .build()
                     .also { INSTANCE = it }
             }

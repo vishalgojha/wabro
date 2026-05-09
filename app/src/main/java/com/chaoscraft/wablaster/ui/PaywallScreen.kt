@@ -1,8 +1,12 @@
 package com.chaoscraft.wablaster.ui
 
+import android.Manifest
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import android.provider.Settings
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -38,6 +42,11 @@ fun PaywallScreen(onUnlocked: () -> Unit) {
     var accessibilityEnabled by remember { mutableStateOf(validator.isAccessibilityServiceEnabled()) }
     var batteryOptIgnored by remember { mutableStateOf(validator.isBatteryOptimizationIgnored()) }
     var overlayEnabled by remember { mutableStateOf(validator.canDrawOverlays()) }
+    var notificationsGranted by remember { mutableStateOf(validator.isNotificationPermissionGranted()) }
+
+    val notificationPermLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted -> notificationsGranted = granted }
 
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
@@ -46,6 +55,7 @@ fun PaywallScreen(onUnlocked: () -> Unit) {
                 accessibilityEnabled = validator.isAccessibilityServiceEnabled()
                 batteryOptIgnored = validator.isBatteryOptimizationIgnored()
                 overlayEnabled = validator.canDrawOverlays()
+                notificationsGranted = validator.isNotificationPermissionGranted()
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -264,7 +274,23 @@ fun PaywallScreen(onUnlocked: () -> Unit) {
             }
         )
 
-        TextButton(onClick = { accessibilityEnabled = validator.isAccessibilityServiceEnabled(); batteryOptIgnored = validator.isBatteryOptimizationIgnored(); overlayEnabled = validator.canDrawOverlays() }) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            PermissionButton(
+                icon = Icons.Default.Notifications,
+                label = "Notifications",
+                granted = notificationsGranted,
+                onSetup = {
+                    notificationPermLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                }
+            )
+        }
+
+        TextButton(onClick = {
+            accessibilityEnabled = validator.isAccessibilityServiceEnabled()
+            batteryOptIgnored = validator.isBatteryOptimizationIgnored()
+            overlayEnabled = validator.canDrawOverlays()
+            notificationsGranted = validator.isNotificationPermissionGranted()
+        }) {
             Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
             Spacer(Modifier.width(4.dp))
             Text("Refresh Status")
