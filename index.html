@@ -17,13 +17,13 @@
 
         /* Hero */
         .hero {
-            min-height: 80vh;
+            min-height: 70vh;
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
             text-align: center;
-            padding: 80px 0;
+            padding: 60px 0;
         }
         .hero h1 {
             font-size: clamp(2.5rem, 6vw, 4rem);
@@ -34,10 +34,10 @@
             background-clip: text;
         }
         .hero p {
-            font-size: 1.2rem;
+            font-size: 1.15rem;
             color: #b0b8c1;
             max-width: 600px;
-            margin: 20px 0 40px;
+            margin: 16px 0 32px;
         }
         .hero-buttons { display: flex; gap: 16px; flex-wrap: wrap; justify-content: center; }
         .btn {
@@ -51,58 +51,61 @@
         .btn-outline:hover { background: #25D36622; }
 
         /* Features */
-        .features { padding: 80px 0; }
+        .features { padding: 64px 0; }
         .features h2 {
-            text-align: center; font-size: 2rem; margin-bottom: 48px;
+            text-align: center; font-size: 1.8rem; margin-bottom: 36px;
         }
-        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 24px; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
         .card {
-            background: #1a1a1a; border-radius: 16px; padding: 32px 24px;
+            background: #1a1a1a; border-radius: 14px; padding: 24px 20px;
             border: 1px solid #2a2a2a; transition: .2s;
         }
-        .card:hover { border-color: #25D366; transform: translateY(-4px); }
-        .card .icon { font-size: 2rem; margin-bottom: 12px; }
-        .card h3 { font-size: 1.1rem; margin-bottom: 8px; color: #25D366; }
-        .card p { font-size: .9rem; color: #b0b8c1; }
+        .card:hover { border-color: #25D366; transform: translateY(-3px); }
+        .card .icon { font-size: 1.6rem; margin-bottom: 8px; }
+        .card h3 { font-size: 1rem; margin-bottom: 6px; color: #25D366; }
+        .card p { font-size: .85rem; color: #b0b8c1; }
 
         /* Partnership / PropAI */
         .partnership {
-            background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 16px;
-            padding: 48px 32px; text-align: center; margin: 40px 0;
+            background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 14px;
+            padding: 36px 28px; text-align: center; margin: 32px 0;
         }
-        .partnership h2 { font-size: 1.8rem; margin-bottom: 12px; }
-        .partnership p { color: #b0b8c1; max-width: 600px; margin: 0 auto 24px; }
+        .partnership h2 { font-size: 1.5rem; margin-bottom: 10px; }
+        .partnership p { color: #b0b8c1; max-width: 600px; margin: 0 auto 20px; }
         .partnership .badge {
             display: inline-block; background: #25D36622; color: #25D366;
-            padding: 6px 16px; border-radius: 20px; font-size: .85rem; font-weight: 600;
-            margin-bottom: 20px;
+            padding: 5px 14px; border-radius: 20px; font-size: .8rem; font-weight: 600;
+            margin-bottom: 16px;
         }
 
         /* How it works */
-        .steps { padding: 60px 0; }
-        .steps h2 { text-align: center; font-size: 2rem; margin-bottom: 40px; }
-        .step-list { display: flex; flex-direction: column; gap: 20px; max-width: 600px; margin: 0 auto; }
-        .step { display: flex; gap: 16px; align-items: flex-start; }
+        .steps { padding: 48px 0; }
+        .steps h2 { text-align: center; font-size: 1.8rem; margin-bottom: 32px; }
+        .step-list { display: flex; flex-direction: column; gap: 16px; max-width: 600px; margin: 0 auto; }
+        .step { display: flex; gap: 14px; align-items: flex-start; }
         .step .num {
-            min-width: 36px; height: 36px; border-radius: 50%;
-            background: #25D366; color: #000; font-weight: 700;
+            min-width: 32px; height: 32px; border-radius: 50%;
+            background: #25D366; color: #000; font-weight: 700; font-size: .9rem;
             display: flex; align-items: center; justify-content: center; flex-shrink: 0;
         }
-        .step h4 { margin-bottom: 4px; }
-        .step p { font-size: .9rem; color: #b0b8c1; }
+        .step h4 { margin-bottom: 2px; font-size: .95rem; }
+        .step p { font-size: .85rem; color: #b0b8c1; }
 
         /* Footer */
         footer {
-            text-align: center; padding: 40px 0;
-            border-top: 1px solid #2a2a2a; margin-top: 60px;
-            color: #54656f; font-size: .85rem;
+            text-align: center; padding: 32px 0;
+            border-top: 1px solid #2a2a2a; margin-top: 48px;
+            color: #54656f; font-size: .8rem;
         }
         footer a { color: #25D366; text-decoration: none; }
 
         @media (max-width: 600px) {
-            .hero { min-height: 60vh; padding: 60px 0; }
+            .hero { min-height: 50vh; padding: 40px 0; }
             .hero-buttons { flex-direction: column; align-items: stretch; }
             .btn { justify-content: center; }
+            .features { padding: 40px 0; }
+            .steps { padding: 32px 0; }
+            footer { margin-top: 32px; padding: 24px 0; }
         }
     </style>
 </head>
