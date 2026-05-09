@@ -1,0 +1,9 @@
+.git
+.gradle
+app/build
+build
+*.apk
+release.keystore
+keystore.properties
+node_modules
+landing
