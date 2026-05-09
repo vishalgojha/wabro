@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">WaBro</string>
+    <string name="accessibility_description">WaBro uses accessibility to send WhatsApp messages through the app\'s own UI with human-like timing.</string>
+    <string name="notification_broadcast_running">Broadcast campaign running...</string>
+    <string name="notification_broadcast_paused">Broadcast campaign paused</string>
+    <string name="notification_broadcast_complete">Broadcast campaign complete</string>
+    <string name="permission_accessibility_title">Enable Accessibility Service</string>
+    <string name="permission_accessibility_message">WaBro needs Accessibility Service access to send messages through WhatsApp automatically. Your messages and data are never stored or transmitted.</string>
+    <string name="btn_start_broadcast">Start Broadcast</string>
+    <string name="btn_pause">Pause</string>
+    <string name="btn_resume">Resume</string>
+    <string name="btn_stop">Stop</string>
+    <string name="paywall_title">License Required</string>
+    <string name="paywall_description">One-time payment for lifetime access</string>
+    <string name="paywall_pay">Pay ₹%s to unlock</string>
+    <string name="paywall_instructions">1. Pay ₹%s to the UPI ID above\n2. Tap \"I\'ve Paid\" below to unlock</string>
+    <string name="paywall_unlock_button">I\'ve Paid — Unlock</string>
+    <string name="paywall_help">Need help? Contact us</string>
+</resources>
