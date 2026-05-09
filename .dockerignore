@@ -13,4 +13,5 @@ keystore.properties
 release.keystore
 node_modules
 landing
-*.md
+README.md
+*.apk
