@@ -8,14 +8,22 @@ import android.os.Build
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.chaoscraft.wablaster.campaign.CampaignManager
-import com.chaoscraft.wablaster.service.BroadcastForegroundService
-import com.chaoscraft.wablaster.campaign.CsvImporter
+import com.chaoscraft.wablaster.db.daos.BroadcastListContactDao
+import com.chaoscraft.wablaster.db.daos.BroadcastListDao
 import com.chaoscraft.wablaster.db.daos.CampaignDao
 import com.chaoscraft.wablaster.db.daos.ContactDao
+import com.chaoscraft.wablaster.db.daos.CampaignResponseDao
+import com.chaoscraft.wablaster.db.daos.BrokerDao
+import com.chaoscraft.wablaster.db.daos.BrokerGroupDao
+import com.chaoscraft.wablaster.db.daos.DealDao
+import com.chaoscraft.wablaster.db.daos.ListingDao
+import com.chaoscraft.wablaster.db.entities.BrokerGroup
 import com.chaoscraft.wablaster.db.entities.Campaign
 import com.chaoscraft.wablaster.db.entities.CampaignStatus
 import com.chaoscraft.wablaster.db.entities.Contact
+import com.chaoscraft.wablaster.db.entities.Listing
 import com.chaoscraft.wablaster.engine.SkillsConfig
+import com.chaoscraft.wablaster.service.BroadcastForegroundService
 import com.chaoscraft.wablaster.util.SenderConfig
 import com.google.gson.Gson
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -27,10 +35,17 @@ import javax.inject.Inject
 class CampaignViewModel @Inject constructor(
     application: Application,
     private val campaignManager: CampaignManager,
-    private val csvImporter: CsvImporter,
+    private val csvImporter: com.chaoscraft.wablaster.campaign.CsvImporter,
     private val campaignDao: CampaignDao,
     private val contactDao: ContactDao,
-    val senderConfig: SenderConfig
+    private val brokerDao: BrokerDao,
+    private val brokerGroupDao: BrokerGroupDao,
+    private val listingDao: ListingDao,
+    private val dealDao: DealDao,
+    private val responseDao: CampaignResponseDao,
+    val senderConfig: SenderConfig,
+    private val broadcastListDao: BroadcastListDao,
+    private val broadcastListContactDao: BroadcastListContactDao
 ) : AndroidViewModel(application) {
 
     val stats = campaignManager.stats
@@ -47,6 +62,10 @@ class CampaignViewModel @Inject constructor(
     val activeCampaign = MutableStateFlow<Campaign?>(null)
     val savedCampaigns = MutableStateFlow<List<Campaign>>(emptyList())
     val runningCampaign = MutableStateFlow<Campaign?>(null)
+
+    // V2: Expose lists from DAOs
+    val allGroups: Flow<List<BrokerGroup>> = brokerGroupDao.getAll()
+    val listings: Flow<List<Listing>> = listingDao.getAllFlow()
 
     private val gson = Gson()
 
@@ -75,46 +94,64 @@ class CampaignViewModel @Inject constructor(
     fun importCsv(uri: Uri) {
         csvUri.value = uri
         viewModelScope.launch {
-            val result = csvImporter.import(uri, 0)
-            importedContacts.value = result.contacts
-            importErrors.value = result.errors
-            importTotalRows.value = result.totalRows
+            try {
+                val result = csvImporter.import(uri, 0)
+                importedContacts.value = result.contacts
+                importErrors.value = result.errors
+                importTotalRows.value = result.totalRows
+            } catch (e: Exception) {
+                importErrors.value = listOf("CSV import failed: ${e.message}")
+            }
         }
     }
 
     fun createAndStartCampaign() {
         viewModelScope.launch {
-            val campaign = Campaign(
-                name = campaignName.value,
-                messageTemplate = messageTemplate.value,
-                mediaUri = mediaUri.value?.toString(),
-                skillsConfigJson = gson.toJson(skillsConfig.value)
-            )
-            val id = campaignDao.insert(campaign)
-            val saved = campaign.copy(id = id)
-            activeCampaign.value = saved
+            try {
+                val campaign = Campaign(
+                    name = campaignName.value,
+                    messageTemplate = messageTemplate.value,
+                    mediaUri = mediaUri.value?.toString(),
+                    skillsConfigJson = gson.toJson(skillsConfig.value)
+                )
+                val id = campaignDao.insert(campaign)
+                val saved = campaign.copy(id = id)
+                activeCampaign.value = saved
 
-            val persistedContacts = importedContacts.value.map { it.copy(campaignId = id) }
-            contactDao.insertAll(persistedContacts)
+                val persistedContacts = importedContacts.value.map { it.copy(campaignId = id) }
+                contactDao.insertAll(persistedContacts)
 
-            startForegroundService()
-            campaignManager.startCampaign(
-                campaignId = id,
-                contacts = persistedContacts,
-                messageTemplate = messageTemplate.value,
-                mediaUri = mediaUri.value,
-                skillsConfig = skillsConfig.value
-            )
+                startForegroundService()
+                campaignManager.startCampaign(
+                    campaignId = id,
+                    contacts = persistedContacts,
+                    messageTemplate = messageTemplate.value,
+                    mediaUri = mediaUri.value,
+                    skillsConfig = skillsConfig.value
+                )
+            } catch (e: Exception) {
+                importErrors.value = listOf("Failed to start campaign: ${e.message}")
+            }
+        }
+    }
+
+    fun associateListing(listingId: Long) {
+        activeCampaign.value?.let { campaign ->
+            campaignManager.associateListing(campaign.id, listingId)
         }
     }
 
     private fun startForegroundService() {
         val context = getApplication<Application>()
-        val intent = Intent(context, BroadcastForegroundService::class.java)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            context.startForegroundService(intent)
-        } else {
-            context.startService(intent)
+        try {
+            val intent = Intent(context, BroadcastForegroundService::class.java)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                context.startForegroundService(intent)
+            } else {
+                context.startService(intent)
+            }
+        } catch (e: Exception) {
+            // Service start failed - log but don't crash
         }
     }
 
@@ -140,6 +177,8 @@ class CampaignViewModel @Inject constructor(
     fun stopCampaign() {
         campaignManager.stopCampaign()
         val context = getApplication<Application>()
-        context.stopService(Intent(context, BroadcastForegroundService::class.java))
+        try {
+            context.stopService(Intent(context, BroadcastForegroundService::class.java))
+        } catch (_: Exception) { }
     }
 }

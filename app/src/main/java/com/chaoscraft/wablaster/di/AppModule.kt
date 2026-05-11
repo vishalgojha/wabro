@@ -3,12 +3,12 @@ package com.chaoscraft.wablaster.di
 import android.content.Context
 import android.content.SharedPreferences
 import com.chaoscraft.wablaster.db.AppDatabase
-import com.chaoscraft.wablaster.db.daos.BroadcastListContactDao
-import com.chaoscraft.wablaster.db.daos.BroadcastListDao
-import com.chaoscraft.wablaster.db.daos.CampaignDao
-import com.chaoscraft.wablaster.db.daos.ContactDao
-import com.chaoscraft.wablaster.db.daos.SendLogDao
+import com.chaoscraft.wablaster.db.daos.*
+import com.chaoscraft.wablaster.db.BrokerRepository
+import com.chaoscraft.wablaster.db.ListingRepository
 import com.chaoscraft.wablaster.engine.HumanTimingEngine
+import com.chaoscraft.wablaster.engine.ResponseClassifier
+import com.chaoscraft.wablaster.engine.ResponseTracker
 import com.chaoscraft.wablaster.engine.Skill
 import com.chaoscraft.wablaster.engine.SkillPipeline
 import com.chaoscraft.wablaster.engine.skills.*
@@ -31,6 +31,8 @@ object AppModule {
     fun provideAppDatabase(@ApplicationContext context: Context): AppDatabase {
         return AppDatabase.getInstance(context)
     }
+
+    // ===== DAO Providers =====
 
     @Provides
     @Singleton
@@ -62,10 +64,79 @@ object AppModule {
         return database.broadcastListContactDao()
     }
 
+    // ===== V2 DAO Providers =====
+
     @Provides
     @Singleton
-    fun provideSharedPreferences(@ApplicationContext context: Context): SharedPreferences {
-        return context.getSharedPreferences("wablaster_prefs", Context.MODE_PRIVATE)
+    fun provideBrokerDao(database: AppDatabase): BrokerDao {
+        return database.brokerDao()
+    }
+
+    @Provides
+    @Singleton
+    fun provideBrokerGroupDao(database: AppDatabase): BrokerGroupDao {
+        return database.brokerGroupDao()
+    }
+
+    @Provides
+    @Singleton
+    fun provideBrokerGroupCrossRefDao(database: AppDatabase): BrokerGroupCrossRefDao {
+        return database.brokerGroupCrossRefDao()
+    }
+
+    @Provides
+    @Singleton
+    fun provideListingDao(database: AppDatabase): ListingDao {
+        return database.listingDao()
+    }
+
+    @Provides
+    @Singleton
+    fun provideCampaignResponseDao(database: AppDatabase): CampaignResponseDao {
+        return database.campaignResponseDao()
+    }
+
+    @Provides
+    @Singleton
+    fun provideDealDao(database: AppDatabase): DealDao {
+        return database.dealDao()
+    }
+
+    // ===== Repositories =====
+
+    @Provides
+    @Singleton
+    fun provideBrokerRepository(
+        brokerDao: BrokerDao,
+        groupDao: BrokerGroupDao,
+        crossRefDao: BrokerGroupCrossRefDao,
+        @ApplicationContext context: Context
+    ): BrokerRepository {
+        return BrokerRepository(brokerDao, groupDao, crossRefDao, context)
+    }
+
+    @Provides
+    @Singleton
+    fun provideListingRepository(
+        listingDao: ListingDao,
+        responseDao: CampaignResponseDao,
+        dealDao: DealDao,
+        sendLogDao: SendLogDao
+    ): ListingRepository {
+        return ListingRepository(listingDao, responseDao, dealDao, sendLogDao)
+    }
+
+    // ===== Engine =====
+
+    @Provides
+    @Singleton
+    fun provideResponseTracker(
+        responseDao: CampaignResponseDao,
+        dealDao: DealDao,
+        brokerDao: BrokerDao,
+        listingDao: ListingDao
+    ): ResponseTracker {
+        return ResponseTracker(responseDao, dealDao, brokerDao, listingDao)
     }
 
     @Provides
@@ -92,5 +163,13 @@ object AppModule {
     @Singleton
     fun provideSkillPipeline(skills: @JvmSuppressWildcards List<Skill>): SkillPipeline {
         return SkillPipeline(skills)
+    }
+
+    // ===== Shared =====
+
+    @Provides
+    @Singleton
+    fun provideSharedPreferences(@ApplicationContext context: Context): SharedPreferences {
+        return context.getSharedPreferences("wablaster_prefs", Context.MODE_PRIVATE)
     }
 }

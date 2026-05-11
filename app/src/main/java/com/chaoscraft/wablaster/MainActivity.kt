@@ -47,6 +47,14 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Start the dashboard sync manager
+        DashboardSyncManager.start(this)
+        
+        // Initialize installation time if not set
+        if (paymentManager.installedAt == 0L) {
+            paymentManager.installedAt = System.currentTimeMillis()
+        }
+        
         setContent {
             WaBlasterTheme {
                 Surface(

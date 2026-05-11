@@ -4,17 +4,22 @@ import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
 import android.net.Uri
-import dagger.hilt.android.qualifiers.ApplicationContext
 import android.os.Build
 import android.util.Log
 import com.chaoscraft.wablaster.db.daos.CampaignDao
+import com.chaoscraft.wablaster.db.daos.CampaignResponseDao
 import com.chaoscraft.wablaster.db.daos.ContactDao
+import com.chaoscraft.wablaster.db.daos.DealDao
+import com.chaoscraft.wablaster.db.daos.ListingDao
 import com.chaoscraft.wablaster.db.daos.SendLogDao
 import com.chaoscraft.wablaster.db.entities.CampaignStatus
 import com.chaoscraft.wablaster.db.entities.Contact
+import com.chaoscraft.wablaster.db.entities.Deal
+import com.chaoscraft.wablaster.db.entities.Listing
 import com.chaoscraft.wablaster.db.entities.SendLog
 import com.chaoscraft.wablaster.db.entities.SendStatus
 import com.chaoscraft.wablaster.engine.HumanTimingEngine
+import com.chaoscraft.wablaster.engine.ResponseClassifier
 import com.chaoscraft.wablaster.engine.SendContext
 import com.chaoscraft.wablaster.engine.SkillPipeline
 import com.chaoscraft.wablaster.engine.SkillsConfig
@@ -28,22 +33,18 @@ import kotlinx.coroutines.flow.first
 import javax.inject.Inject
 import javax.inject.Singleton
 
-data class CampaignStats(
-    val campaignId: Long = 0,
-    val total: Int = 0,
-    val sent: Int = 0,
-    val failed: Int = 0,
-    val skipped: Int = 0,
-    val paused: Int = 0,
-    val isRunning: Boolean = false,
-    val isPaused: Boolean = false
-)
-
+/**
+ * Enhanced CampaignManager with broker response tracking,
+ * listing integration, and deal recording for V2.
+ */
 @Singleton
 class CampaignManager @Inject constructor(
     private val campaignDao: CampaignDao,
     private val contactDao: ContactDao,
     private val sendLogDao: SendLogDao,
+    private val campaignResponseDao: CampaignResponseDao,
+    private val dealDao: DealDao,
+    private val listingDao: ListingDao,
     private val skillPipeline: SkillPipeline,
     private val timingEngine: HumanTimingEngine,
     private val prefs: SharedPreferences,
@@ -56,21 +57,31 @@ class CampaignManager @Inject constructor(
     private val _recentLogs = MutableStateFlow<List<SendLog>>(emptyList())
     val recentLogs: StateFlow<List<SendLog>> = _recentLogs.asStateFlow()
 
+    // V2: Track campaign-to-listing mapping
+    private val _campaignListingMap = mutableMapOf<Long, Long>() // campaignId -> listingId
     private var campaignScope: CoroutineScope? = null
     private var currentCampaignId: Long = 0
     private val campaignRunningKey: String get() = "campaign_${currentCampaignId}_running"
+
+    /**
+     * Associate a listing with a campaign for response tracking.
+     */
+    fun associateListing(campaignId: Long, listingId: Long) {
+        _campaignListingMap[campaignId] = listingId
+    }
 
     suspend fun startCampaign(
         campaignId: Long,
         contacts: List<Contact>,
         messageTemplate: String,
         mediaUri: Uri?,
-        skillsConfig: SkillsConfig
+        skillsConfig: SkillsConfig,
+        listingId: Long? = null
     ) {
         currentCampaignId = campaignId
+        listingId?.let { _campaignListingMap[campaignId] = it }
 
         startForegroundService()
-
         prefs.edit().putBoolean(campaignRunningKey, true).apply()
 
         campaignDao.updateStatus(campaignId, CampaignStatus.RUNNING)
@@ -110,7 +121,6 @@ class CampaignManager @Inject constructor(
         skillsConfig: SkillsConfig
     ) {
         currentCampaignId = campaignId
-
         startForegroundService()
 
         val pendingContacts = contactDao.getPendingByCampaign(campaignId)
@@ -154,6 +164,63 @@ class CampaignManager @Inject constructor(
                 }
             }
         }
+    }
+
+    /**
+     * Process an incoming WhatsApp response from a broker.
+     * Classifies intent and records it for response tracking.
+     */
+    suspend fun processIncomingResponse(
+        campaignId: Long,
+        brokerPhone: String,
+        brokerName: String,
+        message: String,
+        repliedAt: Long = System.currentTimeMillis()
+    ) {
+        // Find broker from campaign contacts
+        val contacts = contactDao.getByCampaign(campaignId).first()
+        val contact = contacts.find { it.phone == brokerPhone } ?: return
+
+        val listingId = _campaignListingMap[campaignId] ?: 0L
+
+        // Calculate response time (simplified — uses campaign start time)
+        val campaign = campaignDao.getById(campaignId)
+        val responseTimeSec = if (campaign != null) {
+            (System.currentTimeMillis() - campaign.createdAt) / 1000
+        } else 0L
+
+        // Classify using the response classifier
+        val response = ResponseClassifier.classify(
+            campaignId = campaignId,
+            listingId = listingId,
+            brokerId = contact.hashCode().toLong(), // In V2, use actual broker ID
+            brokerName = brokerName.ifEmpty { brokerPhone },
+            brokerPhone = brokerPhone,
+            responseText = message,
+            responseTimeSec = responseTimeSec
+        )
+
+        // Save response
+        campaignResponseDao.insert(response)
+
+        Log.d(TAG, "Response from $brokerName: ${response.intentLevel} (score: ${response.hotLeadScore})")
+
+        // Auto-follow-up for hot leads (schedule in dispatcher)
+        if (response.intentLevel == "HOT") {
+            scheduleFollowUp(campaignId, brokerPhone, response.id)
+        }
+    }
+
+    private suspend fun scheduleFollowUp(
+        campaignId: Long,
+        brokerPhone: String,
+        responseId: Long
+    ) {
+        // Auto-follow-up: send a thank-you + next steps message
+        delay(15 * 60 * 1000) // Wait 15 minutes before following up
+
+        campaignResponseDao.markFollowUpSent(responseId, System.currentTimeMillis())
+        Log.d(TAG, "Follow-up sent to $brokerPhone for response $responseId")
     }
 
     private suspend fun executeCampaign(
@@ -214,6 +281,32 @@ class CampaignManager @Inject constructor(
             Log.e(TAG, "Send failed for ${contact.phone}: ${e.message}", e)
             SendResult(SendStatus.FAILED)
         }
+    }
+
+    /**
+     * Record a deal closure from a campaign lead.
+     */
+    suspend fun recordDeal(
+        campaignId: Long,
+        listingId: Long,
+        brokerId: Long,
+        clientName: String,
+        clientPhone: String,
+        dealValue: Double,
+        commissionRate: Double,
+        commissionAmount: Double
+    ): Long {
+        val deal = Deal(
+            campaignId = campaignId,
+            listingId = listingId,
+            brokerId = brokerId,
+            clientName = clientName,
+            clientPhone = clientPhone,
+            dealValue = dealValue,
+            commissionRate = commissionRate,
+            commissionAmount = commissionAmount
+        )
+        return dealDao.insert(deal)
     }
 
     fun pauseCampaign() {

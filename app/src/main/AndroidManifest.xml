@@ -30,7 +30,7 @@
         android:theme="@style/Theme.WABlaster">
 
         <activity
-            android:name=".MainActivity"
+            android:name=".V2MainActivity"
             android:exported="true"
             android:theme="@style/Theme.WABlaster">
             <intent-filter>
@@ -38,6 +38,12 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Legacy activity for backward compatibility -->
+        <activity
+            android:name=".MainActivity"
+            android:exported="false"
+            android:theme="@style/Theme.WABlaster" />
 
         <service
             android:name=".service.WhatsAppAccessibilityService"
@@ -54,6 +60,11 @@ android:label="WaBro"
 
         <service
             android:name=".service.BroadcastForegroundService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
+
+        <service
+            android:name=".service.DashboardSyncManager"
             android:exported="false"
             android:foregroundServiceType="dataSync" />
 
