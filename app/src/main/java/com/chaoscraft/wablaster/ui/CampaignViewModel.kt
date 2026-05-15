@@ -28,8 +28,11 @@ import com.chaoscraft.wablaster.db.entities.Broker
 import com.chaoscraft.wablaster.db.entities.Listing
 import com.chaoscraft.wablaster.db.entities.SendLog
 import com.chaoscraft.wablaster.engine.SkillsConfig
+import com.chaoscraft.wablaster.media.MediaHelper
 import com.chaoscraft.wablaster.service.BroadcastForegroundService
 import com.chaoscraft.wablaster.util.SenderConfig
+import com.chaoscraft.wablaster.util.UploadMediaRequest
+import com.chaoscraft.wablaster.util.WaBroApiClient
 import com.google.gson.Gson
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -51,6 +54,8 @@ class CampaignViewModel @Inject constructor(
     private val dealDao: DealDao,
     private val responseDao: CampaignResponseDao,
     private val sendLogDao: SendLogDao,
+    private val mediaHelper: MediaHelper,
+    private val waBroApiClient: WaBroApiClient,
     val senderConfig: SenderConfig,
     private val broadcastListDao: BroadcastListDao,
     private val broadcastListContactDao: BroadcastListContactDao
@@ -252,10 +257,11 @@ class CampaignViewModel @Inject constructor(
     fun createAndStartCampaign() {
         viewModelScope.launch {
             try {
+                val resolvedMediaUri = uploadMediaIfNeeded(mediaUri.value)
                 val campaign = Campaign(
                     name = campaignName.value,
                     messageTemplate = messageTemplate.value,
-                    mediaUri = mediaUri.value?.toString(),
+                    mediaUri = resolvedMediaUri?.toString(),
                     skillsConfigJson = gson.toJson(skillsConfig.value)
                 )
                 val id = campaignDao.insert(campaign)
@@ -271,7 +277,7 @@ class CampaignViewModel @Inject constructor(
                     campaignId = id,
                     contacts = persistedContacts,
                     messageTemplate = messageTemplate.value,
-                    mediaUri = mediaUri.value,
+                    mediaUri = resolvedMediaUri,
                     skillsConfig = skillsConfig.value
                 )
                 selectedListingId.value?.let { campaignManager.associateListing(id, it) }
@@ -317,6 +323,31 @@ class CampaignViewModel @Inject constructor(
                 skillsConfig = config
             )
         }
+    }
+
+    private suspend fun uploadMediaIfNeeded(uri: Uri?): Uri? {
+        if (uri == null) return null
+
+        val value = uri.toString()
+        if (value.startsWith("http://") || value.startsWith("https://")) {
+            return uri
+        }
+
+        val mimeType = mediaHelper.getMimeType(uri)
+        val fileName = mediaHelper.getDisplayName(uri)
+        val bytes = mediaHelper.readBytes(uri)
+        val result = waBroApiClient.uploadMedia(
+            UploadMediaRequest(
+                fileName = fileName,
+                mimeType = mimeType,
+                bytes = bytes
+            )
+        )
+
+        return result.fold(
+            onSuccess = { Uri.parse(it.mediaUrl) },
+            onFailure = { throw IllegalStateException("Media upload failed: ${it.message}", it) }
+        )
     }
 
     fun pauseCampaign() = campaignManager.pauseCampaign()

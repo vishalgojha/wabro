@@ -17,24 +17,9 @@ class AppValidator(private val context: Context) {
         val errors = mutableListOf<String>()
         val warnings = mutableListOf<String>()
 
-        val whatsappCheck = isWhatsAppInstalled()
-        if (!whatsappCheck) {
-            errors.add("WhatsApp is not installed")
-        }
-
-        val accessibilityCheck = isAccessibilityServiceEnabled()
-        if (!accessibilityCheck) {
-            errors.add("WaBro accessibility service is not enabled")
-        }
-
         val batteryOptCheck = isBatteryOptimizationIgnored()
         if (!batteryOptCheck) {
-            warnings.add("Battery optimization is not disabled - broadcasts may be interrupted")
-        }
-
-        val overlayCheck = canDrawOverlays()
-        if (!overlayCheck) {
-            warnings.add("Draw-over-other-apps permission not granted (recommended)")
+            warnings.add("Battery optimization is not disabled - background sync may be interrupted")
         }
 
         return ValidationResult(
@@ -94,6 +79,10 @@ class AppValidator(private val context: Context) {
     fun canDrawOverlays(): Boolean {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return true
         return Settings.canDrawOverlays(context)
+    }
+
+    fun isLegacyAutomationReady(): Boolean {
+        return isWhatsAppInstalled() && isAccessibilityServiceEnabled()
     }
 
     fun isNotificationPermissionGranted(): Boolean {

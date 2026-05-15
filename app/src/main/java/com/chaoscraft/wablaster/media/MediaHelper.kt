@@ -1,7 +1,9 @@
 package com.chaoscraft.wablaster.media
 
 import android.content.Context
+import android.database.Cursor
 import android.net.Uri
+import android.provider.OpenableColumns
 import androidx.core.content.FileProvider
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
@@ -44,5 +46,34 @@ class MediaHelper @Inject constructor(
 
     fun getMimeType(uri: Uri): String {
         return context.contentResolver.getType(uri) ?: "image/*"
+    }
+
+    fun readBytes(uri: Uri): ByteArray {
+        return context.contentResolver.openInputStream(uri)?.use { input ->
+            input.readBytes()
+        } ?: error("Unable to read media")
+    }
+
+    fun getDisplayName(uri: Uri): String {
+        if (uri.scheme == "file") {
+            return uri.lastPathSegment ?: "upload.bin"
+        }
+
+        val cursor: Cursor? = context.contentResolver.query(
+            uri,
+            arrayOf(OpenableColumns.DISPLAY_NAME),
+            null,
+            null,
+            null
+        )
+        cursor?.use {
+            if (it.moveToFirst()) {
+                val index = it.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                if (index >= 0) {
+                    return it.getString(index) ?: "upload.bin"
+                }
+            }
+        }
+        return uri.lastPathSegment ?: "upload.bin"
     }
 }

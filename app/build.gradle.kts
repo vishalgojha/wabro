@@ -125,6 +125,9 @@ dependencies {
     // Gson
     implementation("com.google.code.gson:gson:2.10.1")
 
+    // Networking
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+
     // Lifecycle Process (for foreground service awareness)
     implementation("androidx.lifecycle:lifecycle-process:2.7.0")
 

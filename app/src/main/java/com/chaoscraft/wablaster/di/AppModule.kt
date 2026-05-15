@@ -12,14 +12,17 @@ import com.chaoscraft.wablaster.engine.ResponseTracker
 import com.chaoscraft.wablaster.engine.Skill
 import com.chaoscraft.wablaster.engine.SkillPipeline
 import com.chaoscraft.wablaster.engine.skills.*
-import com.chaoscraft.wablaster.service.AccessibilityBridge
 import com.chaoscraft.wablaster.util.AiConfig
 import com.chaoscraft.wablaster.util.GeminiClient
+import com.google.gson.Gson
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
+import kotlinx.coroutines.flow.MutableSharedFlow
+import okhttp3.OkHttpClient
+import java.util.concurrent.TimeUnit
 import javax.inject.Singleton
 
 @Module
@@ -148,13 +151,14 @@ object AppModule {
     @Provides
     @Singleton
     fun provideSkills(prefs: SharedPreferences, gemini: GeminiClient): List<Skill> {
+        val backendReplyEvents = MutableSharedFlow<String>(replay = 0)
         return listOf(
             SpinSkill(),
             MergeSkill(),
             TranslateSkill(gemini),
             SmartCaptionSkill(gemini),
             AIRewriteSkill(gemini),
-            ReplyGuardSkill(AccessibilityBridge.replyFlow),
+            ReplyGuardSkill(backendReplyEvents),
             WarmupSkill(prefs)
         )
     }
@@ -171,5 +175,21 @@ object AppModule {
     @Singleton
     fun provideSharedPreferences(@ApplicationContext context: Context): SharedPreferences {
         return context.getSharedPreferences("wablaster_prefs", Context.MODE_PRIVATE)
+    }
+
+    @Provides
+    @Singleton
+    fun provideGson(): Gson {
+        return Gson()
+    }
+
+    @Provides
+    @Singleton
+    fun provideOkHttpClient(): OkHttpClient {
+        return OkHttpClient.Builder()
+            .connectTimeout(30, TimeUnit.SECONDS)
+            .readTimeout(60, TimeUnit.SECONDS)
+            .writeTimeout(60, TimeUnit.SECONDS)
+            .build()
     }
 }

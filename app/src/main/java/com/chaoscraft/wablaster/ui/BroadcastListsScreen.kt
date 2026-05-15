@@ -26,7 +26,6 @@ import com.chaoscraft.wablaster.db.daos.BroadcastListDao
 import com.chaoscraft.wablaster.db.entities.BroadcastList
 import com.chaoscraft.wablaster.db.entities.BroadcastListContact
 import com.chaoscraft.wablaster.db.entities.Contact
-import com.chaoscraft.wablaster.service.AccessibilityBridge
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -42,10 +41,9 @@ fun BroadcastListsScreen(
     var showCreateDialog by remember { mutableStateOf(false) }
     var selectedList by remember { mutableStateOf<BroadcastList?>(null) }
     var listContacts by remember { mutableStateOf<List<BroadcastListContact>>(emptyList()) }
-
-    var showGroupImportDialog by remember { mutableStateOf(false) }
     val smartListContext = androidx.compose.ui.platform.LocalContext.current
     var showSmartListDialog by remember { mutableStateOf(false) }
+    var showGroupImportInfo by remember { mutableStateOf(false) }
 
     val csvPicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
@@ -75,7 +73,7 @@ fun BroadcastListsScreen(
                 fontWeight = FontWeight.Bold
             )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilledTonalButton(onClick = { showGroupImportDialog = true }) {
+                FilledTonalButton(onClick = { showGroupImportInfo = true }) {
                     Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(4.dp))
                     Text("Group")
@@ -184,43 +182,9 @@ fun BroadcastListsScreen(
         )
     }
 
-    if (showGroupImportDialog) {
-        GroupImportDialog(
-            onDismiss = { showGroupImportDialog = false },
-            onImport = { groupName ->
-                scope.launch {
-                    showGroupImportDialog = false
-                    val result = AccessibilityBridge.scrapeGroupContacts(groupName)
-                    if (result.error != null) {
-                        android.widget.Toast.makeText(
-                            smartListContext,
-                            "Error: ${result.error}",
-                            android.widget.Toast.LENGTH_LONG
-                        ).show()
-                    } else {
-                        val listId = selectedList?.id
-                            ?: broadcastListDao.insert(BroadcastList(name = groupName))
-                        val chunks = result.contacts.chunked(100)
-                        chunks.forEachIndexed { index, chunk ->
-                            val actualListId = if (index == 0) listId
-                                else broadcastListDao.insert(BroadcastList(name = "$groupName (${index + 1})"))
-                            val contacts = chunk.map { c ->
-                                BroadcastListContact(listId = actualListId, phone = c.phone, name = c.name)
-                            }
-                            broadcastListContactDao.insertAll(contacts)
-                            broadcastListDao.updateContactCount(actualListId)
-                        }
-                        if (selectedList != null) {
-                            listContacts = broadcastListContactDao.getByListSync(listId)
-                        }
-                        android.widget.Toast.makeText(
-                            smartListContext,
-                            "Imported ${result.contacts.size} contacts from group",
-                            android.widget.Toast.LENGTH_SHORT
-                        ).show()
-                    }
-                }
-            }
+    if (showGroupImportInfo) {
+        GroupImportUnavailableDialog(
+            onDismiss = { showGroupImportInfo = false }
         )
     }
 
@@ -234,7 +198,7 @@ fun BroadcastListsScreen(
                     csvPicker.launch(arrayOf("text/*", "*/*"))
                 },
                 onImportFromGroup = {
-                    showGroupImportDialog = true
+                    showGroupImportInfo = true
                 },
                 onRemoveContact = { contact ->
                     scope.launch {
@@ -532,47 +496,30 @@ private fun SmartListDialog(
 }
 
 @Composable
-private fun GroupImportDialog(
-    onDismiss: () -> Unit,
-    onImport: (groupName: String) -> Unit
+private fun GroupImportUnavailableDialog(
+    onDismiss: () -> Unit
 ) {
-    var groupName by remember { mutableStateOf("") }
     AlertDialog(
         onDismissRequest = onDismiss,
         icon = { Icon(Icons.Default.People, contentDescription = null) },
-        title = { Text("Import from WhatsApp Group") },
+        title = { Text("Group Import Unavailable") },
         text = {
             Column {
                 Text(
-                    "Enter the exact group name. WaBro will open WhatsApp, search for the group, open group info, and scrape participant names.",
+                    "Group import still depends on the old on-device accessibility flow and is disabled in backend delivery mode.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                Spacer(Modifier.height(4.dp))
+                Spacer(Modifier.height(8.dp))
                 Text(
-                    "Make sure WhatsApp is not already open.",
+                    "Use CSV import, phonebook import, or manual add for now. Backend group sync can be added later through server APIs.",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error
-                )
-                Spacer(Modifier.height(12.dp))
-                OutlinedTextField(
-                    value = groupName,
-                    onValueChange = { groupName = it },
-                    label = { Text("Group Name") },
-                    placeholder = { Text("e.g., Real Estate Leads Group") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         },
         confirmButton = {
-            TextButton(
-                onClick = { onImport(groupName) },
-                enabled = groupName.isNotBlank()
-            ) { Text("Import") }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
+            TextButton(onClick = onDismiss) { Text("OK") }
         }
     )
 }

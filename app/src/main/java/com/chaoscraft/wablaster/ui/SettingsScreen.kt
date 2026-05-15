@@ -144,19 +144,12 @@ fun SettingsScreen(
 
                 val notifGranted = validator.isNotificationPermissionGranted()
                 val checks = buildList {
-                    add(Triple("Accessibility Service", validator.isAccessibilityServiceEnabled()) {
-                        context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
-                    })
+                    add(Triple("Backend Delivery", true) {})
                     add(Triple("Battery Optimization", validator.isBatteryOptimizationIgnored()) {
                         val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
                             data = Uri.parse("package:${context.packageName}")
                         }
                         context.startActivity(intent)
-                    })
-                    add(Triple("Draw Over Other Apps", validator.canDrawOverlays()) {
-                        context.startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION).apply {
-                            data = Uri.parse("package:${context.packageName}")
-                        })
                     })
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                         add(Triple("Notifications", notifGranted) {
@@ -232,10 +225,18 @@ fun SettingsScreen(
                 Spacer(Modifier.height(8.dp))
                 Text("WaBro v1.0.0", style = MaterialTheme.typography.bodyMedium)
                 Text(
-                    "Broadcast WhatsApp messages with human-like timing",
+                    "Broadcast campaigns using backend-managed WhatsApp delivery",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                if (validator.isLegacyAutomationReady()) {
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "Legacy on-device automation is still detectable on this phone, but backend delivery is the default path.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
                 Spacer(Modifier.height(8.dp))
                 OutlinedButton(
                     onClick = { showLandingPage = true },

@@ -2,7 +2,6 @@ package com.chaoscraft.wablaster.ui
 
 import android.content.Intent
 import android.net.Uri
-import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
@@ -17,7 +16,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.chaoscraft.wablaster.R
 import com.chaoscraft.wablaster.util.AppValidator
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -28,7 +26,6 @@ fun HomeScreen(
 ) {
     val context = LocalContext.current
     val scrollState = rememberScrollState()
-    var showAccessibilityDialog by remember { mutableStateOf(false) }
 
     val csvPicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
@@ -37,10 +34,6 @@ fun HomeScreen(
     val mediaPicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri -> uri?.let { viewModel.mediaUri.value = it } }
-
-    val batteryOptLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.StartActivityForResult()
-    ) { }
 
     val campaignName by viewModel.campaignName.collectAsState()
     val messageTemplate by viewModel.messageTemplate.collectAsState()
@@ -69,23 +62,6 @@ fun HomeScreen(
             },
             confirmButton = {
                 TextButton(onClick = { showValidationDialog = false }) { Text("OK") }
-            }
-        )
-    }
-
-    if (showAccessibilityDialog) {
-        AlertDialog(
-            onDismissRequest = { showAccessibilityDialog = false },
-            title = { Text(context.getString(R.string.permission_accessibility_title)) },
-            text = { Text(context.getString(R.string.permission_accessibility_message)) },
-            confirmButton = {
-                TextButton(onClick = {
-                    showAccessibilityDialog = false
-                    context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
-                }) { Text("Open Settings") }
-            },
-            dismissButton = {
-                TextButton(onClick = { showAccessibilityDialog = false }) { Text("Later") }
             }
         )
     }
@@ -190,10 +166,19 @@ fun HomeScreen(
                     Text(if (viewModel.mediaUri.value != null) "Change Media" else "Attach Media")
                 }
                 if (viewModel.mediaUri.value != null) {
+                    val mediaUri = viewModel.mediaUri.value.toString()
                     Text(
-                        text = viewModel.mediaUri.value?.lastPathSegment ?: "",
+                        text = if (mediaUri.startsWith("http://") || mediaUri.startsWith("https://")) {
+                            viewModel.mediaUri.value?.lastPathSegment ?: ""
+                        } else {
+                            "Local media selected. Backend delivery currently requires a remote file URL."
+                        },
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = if (mediaUri.startsWith("http://") || mediaUri.startsWith("https://")) {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        } else {
+                            MaterialTheme.colorScheme.error
+                        }
                     )
                 }
             }

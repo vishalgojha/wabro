@@ -39,9 +39,7 @@ fun PaywallScreen(onUnlocked: () -> Unit) {
     val validator = remember { AppValidator(context) }
     val paymentManager = remember { com.chaoscraft.wablaster.util.PaymentManager(context) }
     var showContactDialog by remember { mutableStateOf(false) }
-    var accessibilityEnabled by remember { mutableStateOf(validator.isAccessibilityServiceEnabled()) }
     var batteryOptIgnored by remember { mutableStateOf(validator.isBatteryOptimizationIgnored()) }
-    var overlayEnabled by remember { mutableStateOf(validator.canDrawOverlays()) }
     var notificationsGranted by remember { mutableStateOf(validator.isNotificationPermissionGranted()) }
 
     val notificationPermLauncher = rememberLauncherForActivityResult(
@@ -52,9 +50,7 @@ fun PaywallScreen(onUnlocked: () -> Unit) {
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
-                accessibilityEnabled = validator.isAccessibilityServiceEnabled()
                 batteryOptIgnored = validator.isBatteryOptimizationIgnored()
-                overlayEnabled = validator.canDrawOverlays()
                 notificationsGranted = validator.isNotificationPermissionGranted()
             }
         }
@@ -244,18 +240,15 @@ fun PaywallScreen(onUnlocked: () -> Unit) {
             fontWeight = FontWeight.SemiBold
         )
         Text(
-            "One-tap setup for required permissions:",
+            "One-tap setup for backend delivery:",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
 
-        PermissionButton(
-            icon = Icons.Default.SettingsAccessibility,
-            label = "Accessibility Service",
-            granted = accessibilityEnabled,
-            onSetup = {
-                context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
-            }
+        PermissionStatus(
+            icon = Icons.Default.CloudDone,
+            label = "Backend Delivery",
+            description = "Messages are sent through the WaBro backend instead of local accessibility automation."
         )
 
         PermissionButton(
@@ -264,18 +257,6 @@ fun PaywallScreen(onUnlocked: () -> Unit) {
             granted = batteryOptIgnored,
             onSetup = {
                 Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
-                    data = Uri.parse("package:${context.packageName}")
-                    context.startActivity(this)
-                }
-            }
-        )
-
-        PermissionButton(
-            icon = Icons.Default.Visibility,
-            label = "Display Over Other Apps",
-            granted = overlayEnabled,
-            onSetup = {
-                Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION).apply {
                     data = Uri.parse("package:${context.packageName}")
                     context.startActivity(this)
                 }
@@ -294,9 +275,7 @@ fun PaywallScreen(onUnlocked: () -> Unit) {
         }
 
         TextButton(onClick = {
-            accessibilityEnabled = validator.isAccessibilityServiceEnabled()
             batteryOptIgnored = validator.isBatteryOptimizationIgnored()
-            overlayEnabled = validator.canDrawOverlays()
             notificationsGranted = validator.isNotificationPermissionGranted()
         }) {
             Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
@@ -351,6 +330,33 @@ fun PaywallScreen(onUnlocked: () -> Unit) {
         }
 
         Spacer(Modifier.height(32.dp))
+    }
+}
+
+@Composable
+private fun PermissionStatus(
+    icon: ImageVector,
+    label: String,
+    description: String
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            icon,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary
+        )
+        Spacer(Modifier.width(12.dp))
+        Column {
+            Text(label, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
+            Text(
+                description,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
     }
 }
 

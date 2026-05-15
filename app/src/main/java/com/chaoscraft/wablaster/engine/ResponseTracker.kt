@@ -16,12 +16,12 @@ import javax.inject.Singleton
 
 /**
  * Tracks and classifies incoming broker responses for campaign analytics.
- * Polls a message queue populated by the accessibility service and routes
- * responses to the correct campaign/broker with NLP-based intent scoring.
+ * Polls a transient incoming-message queue and routes responses to the
+ * correct campaign/broker with NLP-based intent scoring.
  *
  * Production notes:
- * - In a future WhatsApp Business API integration, replace polling with webhook listeners
- * - The message queue is populated by AccessibilityBridge via a thread-safe callback
+ * - In backend delivery mode, this queue should be fed from webhook or polling events
+ * - The tracker itself is transport-agnostic and only needs normalized inbound messages
  */
 @Singleton
 class ResponseTracker @Inject constructor(
@@ -37,7 +37,7 @@ class ResponseTracker @Inject constructor(
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     /**
-     * Called by AccessibilityBridge when a new incoming WhatsApp message is detected.
+     * Called by whichever transport integration receives a new inbound message.
      */
     @Synchronized
     fun enqueueMessage(senderPhone: String, message: String, timestamp: Long) {
@@ -130,7 +130,7 @@ class ResponseTracker @Inject constructor(
                     "WARM" -> tracker.warmLeadCount++
                     else -> tracker.coldLeadCount++
                 }
-                tracker.lastResponseAt = System.currentTimeMillis()
+                tracker.lastResponseAt = timestamp
 
                 Log.d(TAG,
                     "Response from ${broker.name}: ${response.intentLevel} (score: ${response.hotLeadScore})")

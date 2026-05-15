@@ -23,14 +23,17 @@ import com.chaoscraft.wablaster.engine.ResponseClassifier
 import com.chaoscraft.wablaster.engine.SendContext
 import com.chaoscraft.wablaster.engine.SkillPipeline
 import com.chaoscraft.wablaster.engine.SkillsConfig
-import com.chaoscraft.wablaster.service.AccessibilityBridge
 import com.chaoscraft.wablaster.util.SenderConfig
+import com.chaoscraft.wablaster.util.SendMediaMessageRequest
+import com.chaoscraft.wablaster.util.SendMessageRequest
+import com.chaoscraft.wablaster.util.WaBroApiClient
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -50,6 +53,7 @@ class CampaignManager @Inject constructor(
     private val timingEngine: HumanTimingEngine,
     private val prefs: SharedPreferences,
     private val senderConfig: SenderConfig,
+    private val waBroApiClient: WaBroApiClient,
     @ApplicationContext private val context: Context
 ) {
     private val _stats = MutableStateFlow(CampaignStats())
@@ -163,7 +167,7 @@ class CampaignManager @Inject constructor(
             brokerPhone = brokerPhone,
             responseText = message,
             responseTimeSec = responseTimeSec
-        )
+        ).copy(repliedAt = repliedAt)
 
         // Save response
         campaignResponseDao.insert(response)
@@ -172,12 +176,11 @@ class CampaignManager @Inject constructor(
 
         // Auto-follow-up for hot leads (schedule in dispatcher)
         if (response.intentLevel == "HOT") {
-            scheduleFollowUp(campaignId, brokerPhone, response.id)
+            scheduleFollowUp(brokerPhone, response.id)
         }
     }
 
     private suspend fun scheduleFollowUp(
-        campaignId: Long,
         brokerPhone: String,
         responseId: Long
     ) {
@@ -244,13 +247,60 @@ class CampaignManager @Inject constructor(
             timingEngine.waitBeforeNextSend(processed.body.length)
             Log.d(TAG, "Sending to ${contact.phone}...")
 
-            val senderPkg = senderConfig.selectedPackage.ifEmpty { "com.whatsapp" }
-            val success = AccessibilityBridge.send(contact, processed, campaignId, senderPkg)
-            Log.d(TAG, "Result for ${contact.phone}: ${if (success) "OK" else "FAIL"}")
-            SendResult(if (success) SendStatus.SENT else SendStatus.FAILED)
+            val result = sendViaBackend(campaignId, contact, processed.body, mediaUri)
+            Log.d(TAG, "Result for ${contact.phone}: ${result.status}")
+            result
         } catch (e: Exception) {
             Log.e(TAG, "Send failed for ${contact.phone}: ${e.message}", e)
             SendResult(SendStatus.FAILED)
+        }
+    }
+
+    private suspend fun sendViaBackend(
+        campaignId: Long,
+        contact: Contact,
+        messageBody: String,
+        mediaUri: Uri?
+    ): SendResult {
+        val deviceId = getOrCreateRemoteDeviceId()
+        val response = if (mediaUri != null) {
+            val mediaUrl = mediaUri.toString()
+            if (!mediaUrl.startsWith("http://") && !mediaUrl.startsWith("https://")) {
+                Log.w(TAG, "Skipping media send for non-remote URI: $mediaUrl")
+                return SendResult(SendStatus.FAILED)
+            }
+            waBroApiClient.sendMediaMessage(
+                SendMediaMessageRequest(
+                    deviceId = deviceId,
+                    campaignId = campaignId,
+                    contactPhone = contact.phone,
+                    contactName = contact.name,
+                    text = messageBody,
+                    mediaUrl = mediaUrl
+                )
+            )
+        } else {
+            waBroApiClient.sendMessage(
+                SendMessageRequest(
+                    deviceId = deviceId,
+                    campaignId = campaignId,
+                    contactPhone = contact.phone,
+                    contactName = contact.name,
+                    text = messageBody
+                )
+            )
+        }
+
+        if (response.isFailure) {
+            Log.e(TAG, "Backend send failed for ${contact.phone}: ${response.exceptionOrNull()?.message}")
+            return SendResult(SendStatus.FAILED)
+        }
+
+        return when (response.getOrThrow().status.lowercase()) {
+            "sent", "queued" -> SendResult(SendStatus.SENT)
+            "skipped" -> SendResult(SendStatus.SKIPPED)
+            "reply_paused" -> SendResult(SendStatus.REPLY_PAUSED)
+            else -> SendResult(SendStatus.FAILED)
         }
     }
 
@@ -412,7 +462,22 @@ class CampaignManager @Inject constructor(
 
     private fun campaignRunningKey(campaignId: Long): String = "campaign_${campaignId}_running"
 
+    private fun getOrCreateRemoteDeviceId(): String {
+        val existing = prefs.getString(KEY_REMOTE_DEVICE_ID, null)
+        if (!existing.isNullOrBlank()) return existing
+
+        val senderNumber = senderConfig.senderNumber.filter(Char::isDigit)
+        val generated = if (senderNumber.isNotEmpty()) {
+            "android-$senderNumber"
+        } else {
+            "android-${UUID.randomUUID()}"
+        }
+        prefs.edit().putString(KEY_REMOTE_DEVICE_ID, generated).apply()
+        return generated
+    }
+
     companion object {
         private const val TAG = "CampaignManager"
+        private const val KEY_REMOTE_DEVICE_ID = "wabro_remote_device_id"
     }
 }
