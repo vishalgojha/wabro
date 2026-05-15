@@ -8,84 +8,64 @@
     <link rel="stylesheet" href="./styles.css" />
 </head>
 <body>
-    <div class="shell">
-        <aside class="sidebar">
-            <div class="brand">
-                <span class="brand-mark">WB</span>
-                <div>
-                    <h1>WaBro</h1>
-                    <p>Control Panel</p>
-                </div>
-            </div>
+    <div class="app-shell">
+        <header class="site-header">
+            <div class="container header-row">
+                <a class="brand-link" href="/">
+                    <span class="brand-mark">WB</span>
+                    <div>
+                        <strong>WaBro</strong>
+                        <span>Web Control Panel</span>
+                    </div>
+                </a>
 
-            <nav class="nav">
+                <nav class="header-actions">
+                    <a class="ghost-btn" href="/">Home</a>
+                    <a class="ghost-btn" href="/#features">Features</a>
+                    <a class="ghost-btn" href="https://app.propai.live">PropAI</a>
+                    <a class="primary-btn" href="/WaBro.apk">Download APK</a>
+                </nav>
+            </div>
+        </header>
+
+        <main class="container">
+            <section class="hero">
+                <p class="eyebrow">WaBro Web Control</p>
+                <h1>Use the web for planning. Keep Android as the execution engine.</h1>
+                <p class="hero-copy">This panel matches the landing page language and avoids fake seeded activity. Until the backend contract exists, the browser should show empty states or manually entered records only.</p>
+                <div class="hero-buttons">
+                    <a class="btn btn-primary" href="/">← Back to Home</a>
+                    <a class="btn btn-outline" href="https://app.propai.live">↗ PropAI</a>
+                    <a class="btn btn-outline" href="/WaBro.apk">↓ Download APK</a>
+                </div>
+            </section>
+
+            <section class="status-strip">
+                <article class="status-card">
+                    <div class="status-kicker">Backend status</div>
+                    <h2>Real sync is not connected</h2>
+                    <p>The Android API client in this repo still returns empty results. Live campaigns, devices, and responses need a real WaBro backend before they can appear here.</p>
+                </article>
+                <article class="status-card">
+                    <div class="status-kicker">Account status</div>
+                    <h2>Shared login is not wired yet</h2>
+                    <p>`app.propai.live` and `wabro.propai.live` can share identity only after both apps trust the same auth provider or token exchange flow.</p>
+                </article>
+            </section>
+
+            <section class="panel-nav">
                 <button class="nav-link active" data-section="overview">Overview</button>
                 <button class="nav-link" data-section="brokers">Brokers</button>
                 <button class="nav-link" data-section="listings">Listings</button>
                 <button class="nav-link" data-section="campaigns">Campaigns</button>
                 <button class="nav-link" data-section="devices">Devices</button>
                 <button class="nav-link" data-section="responses">Responses</button>
-            </nav>
-
-            <div class="sidebar-card">
-                <p class="eyebrow">Execution Model</p>
-                <h2>Web manages, Android sends</h2>
-                <p>The browser is the control plane. The Android app remains the WhatsApp execution client.</p>
-            </div>
-        </aside>
-
-        <main class="main">
-            <header class="topbar">
-                <div>
-                    <p class="eyebrow">WaBro Web Control</p>
-                    <h2>Broker campaign operations</h2>
-                </div>
-                <div class="topbar-actions">
-                    <a class="ghost-btn" href="/">Landing</a>
-                    <a class="ghost-btn" href="https://app.propai.live">PropAI</a>
-                    <a class="primary-btn" href="/WaBro.apk">Download APK</a>
-                </div>
-            </header>
+            </section>
 
             <section class="page active" id="overview">
-                <div class="hero-card">
-                    <div class="hero-layout">
-                        <div>
-                            <p class="eyebrow">Current strategy</p>
-                            <h3>Use the web for planning. Keep Android as the execution engine.</h3>
-                            <p>This panel now uses the same dark visual language as the landing page and intentionally avoids fake seeded metrics. What you see here should come from real sync or explicit manual input.</p>
-                            <div class="hero-actions" style="margin-top: 18px;">
-                                <a class="primary-btn" href="/WaBro.apk">Install Android Client</a>
-                                <a class="ghost-btn" href="https://app.propai.live">Open PropAI</a>
-                            </div>
-                        </div>
-                        <div>
-                            <div class="hero-chip-stack">
-                                <span class="chip">Campaign prep</span>
-                                <span class="chip">Lead tracking</span>
-                                <span class="chip">Device health</span>
-                                <span class="chip">Shared auth not wired yet</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="status-grid">
-                    <article class="status-card">
-                        <div class="status-alert">Prototype shell</div>
-                        <h3>Real backend sync is not connected</h3>
-                        <p>The Android API client in this repo is still stubbed and returns empty lists, so the browser cannot show live campaigns or device status until that contract exists.</p>
-                    </article>
-                    <article class="status-card">
-                        <div class="status-alert">Account model</div>
-                        <h3>PropAI and WaBro do not share auth yet</h3>
-                        <p>Single-account login is possible, but it needs a shared identity provider or delegated token flow. This static `/app/` frontend cannot do that by itself.</p>
-                    </article>
-                </div>
-
                 <div class="stats-grid" id="overview-stats"></div>
 
-                <div class="split-grid">
+                <div class="dashboard-grid">
                     <section class="panel">
                         <div class="panel-head">
                             <div>
