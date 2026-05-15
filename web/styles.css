@@ -21,6 +21,10 @@ body {
     line-height: 1.6;
 }
 
+.hidden {
+    display: none !important;
+}
+
 a,
 button,
 input,
@@ -33,6 +37,51 @@ textarea {
     max-width: 1160px;
     margin: 0 auto;
     padding: 0 24px;
+}
+
+.auth-screen {
+    min-height: 100vh;
+    display: grid;
+    place-items: center;
+}
+
+.auth-card {
+    max-width: 560px;
+    margin: 0 auto;
+    padding: 32px;
+    text-align: center;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 18px;
+}
+
+.auth-card h1 {
+    margin: 0;
+    font-size: clamp(2rem, 4vw, 3rem);
+    background: linear-gradient(135deg, #25d366, #128c7e);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.auth-form {
+    display: grid;
+    gap: 12px;
+    margin-top: 24px;
+}
+
+.auth-form input {
+    padding: 14px 16px;
+    border-radius: 12px;
+    border: 1px solid #333;
+    background: var(--panel-soft);
+    color: var(--ink);
+}
+
+.auth-error {
+    min-height: 24px;
+    margin: 0;
+    color: #ff8a80;
 }
 
 .site-header {

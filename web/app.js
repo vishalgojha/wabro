@@ -1,105 +1,95 @@
-const storageKey = "wabro-control-panel-v2";
+const sessionStorageKey = "wabro-propai-session";
 
-const defaultState = {
-  brokers: [],
-  listings: [],
-  devices: [],
+const state = {
+  session: null,
+  user: null,
+  stats: null,
   campaigns: [],
-  responses: []
+  contactLists: [],
+  contactsByList: new Map()
 };
 
-let state = loadState();
+function getApiBase() {
+  const { hostname, protocol } = window.location;
+  if (hostname === "localhost" || hostname === "127.0.0.1") {
+    return "http://localhost:3001/api";
+  }
+  if (hostname.endsWith("propai.live")) {
+    return `${protocol}//api.propai.live/api`;
+  }
+  return `${window.location.origin}/api`;
+}
 
-function loadState() {
+const apiBase = getApiBase();
+
+function readStoredSession() {
   try {
-    const saved = localStorage.getItem(storageKey);
-    return saved ? JSON.parse(saved) : structuredClone(defaultState);
+    const raw = localStorage.getItem(sessionStorageKey);
+    return raw ? JSON.parse(raw) : null;
   } catch {
-    return structuredClone(defaultState);
+    return null;
   }
 }
 
-function saveState() {
-  localStorage.setItem(storageKey, JSON.stringify(state));
+function saveStoredSession(session) {
+  localStorage.setItem(sessionStorageKey, JSON.stringify(session));
 }
 
-function nextId(items) {
-  return items.reduce((max, item) => Math.max(max, Number(item.id) || 0), 0) + 1;
+function clearStoredSession() {
+  localStorage.removeItem(sessionStorageKey);
 }
 
-function byId(items, id) {
-  return items.find((item) => String(item.id) === String(id));
-}
-
-function normalizePhone(phone) {
-  return String(phone || "").replace(/[^\d+]/g, "").trim();
-}
-
-function brokerExists(phone) {
-  const normalized = normalizePhone(phone);
-  return state.brokers.some((broker) => normalizePhone(broker.phone) === normalized);
-}
-
-function addBrokerRecord({ name, phone, locality = "" }) {
-  const cleanName = String(name || "").trim();
-  const cleanPhone = normalizePhone(phone);
-  const cleanLocality = String(locality || "").trim();
-
-  if (!cleanName || !cleanPhone || brokerExists(cleanPhone)) {
-    return false;
+async function refreshSessionIfNeeded() {
+  const session = state.session;
+  if (!session?.refreshToken || !session?.expiresAt || Date.now() < session.expiresAt - 5 * 60_000) {
+    return;
   }
 
-  state.brokers.push({
-    id: nextId(state.brokers),
-    name: cleanName,
-    phone: cleanPhone,
-    locality: cleanLocality
-  });
-  return true;
-}
-
-function parseBrokerBulkText(input) {
-  return String(input || "")
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => {
-      const [name = "", phone = "", locality = ""] = line.split(",").map((part) => part.trim());
-      return { name, phone, locality };
-    })
-    .filter((broker) => broker.name && broker.phone);
-}
-
-function importBrokerList(rawText) {
-  const parsed = parseBrokerBulkText(rawText);
-  let imported = 0;
-
-  parsed.forEach((broker) => {
-    if (addBrokerRecord(broker)) {
-      imported += 1;
-    }
+  const response = await fetch(`${apiBase}/auth/refresh`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ refreshToken: session.refreshToken })
   });
 
-  return { imported, total: parsed.length };
-}
-
-function formatCurrency(value) {
-  return `Rs ${Number(value || 0).toLocaleString("en-IN")}`;
-}
-
-function emptyState(title, text, actionLabel) {
-  const card = document.createElement("article");
-  card.className = "empty-state";
-  card.innerHTML = `
-    <div class="eyebrow">No live data</div>
-    <h4>${title}</h4>
-    <p>${text}</p>
-    ${actionLabel ? `<button class="secondary-btn" type="button">${actionLabel}</button>` : ""}
-  `;
-  if (actionLabel) {
-    card.querySelector("button").addEventListener("click", () => window.scrollTo({ top: 0, behavior: "smooth" }));
+  if (!response.ok) {
+    throw new Error("Session expired");
   }
-  return card;
+
+  const data = await response.json();
+  const nextSession = {
+    ...session,
+    token: data?.session?.access_token,
+    refreshToken: data?.session?.refresh_token || session.refreshToken,
+    expiresAt: data?.session?.expires_in ? Date.now() + Number(data.session.expires_in) * 1000 : session.expiresAt
+  };
+  state.session = nextSession;
+  saveStoredSession(nextSession);
+}
+
+async function apiFetch(path, options = {}) {
+  await refreshSessionIfNeeded();
+  const headers = {
+    "Content-Type": "application/json",
+    ...(state.session?.token ? { Authorization: `Bearer ${state.session.token}` } : {}),
+    ...(options.headers || {})
+  };
+
+  const response = await fetch(`${apiBase}${path}`, {
+    ...options,
+    headers
+  });
+
+  if (response.status === 401) {
+    logout();
+    throw new Error("Session expired");
+  }
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.error || data.message || "Request failed");
+  }
+
+  return response.json();
 }
 
 function entityCard({ title, meta, body, tag }) {
@@ -114,20 +104,40 @@ function entityCard({ title, meta, body, tag }) {
   return card;
 }
 
+function emptyState(title, text) {
+  const card = document.createElement("article");
+  card.className = "empty-state";
+  card.innerHTML = `
+    <div class="eyebrow">No data</div>
+    <h4>${title}</h4>
+    <p>${text}</p>
+  `;
+  return card;
+}
+
+function formatCurrency(value) {
+  return `Rs ${Number(value || 0).toLocaleString("en-IN")}`;
+}
+
 function renderStats() {
   const statsRoot = document.getElementById("overview-stats");
   const template = document.getElementById("stat-card-template");
-  const hotResponses = state.responses.filter((item) => item.intentLevel === "HOT").length;
-  const closedDeals = state.responses.filter((item) => item.dealClosed).length;
-  const totalDealValue = state.responses.reduce((sum, item) => sum + Number(item.dealValue || 0), 0);
+  const stats = state.stats || {
+    total_campaigns: 0,
+    total_sent: 0,
+    total_failed: 0,
+    total_skipped: 0,
+    active_devices: 0,
+    total_devices: 0
+  };
 
   const cards = [
-    ["Brokers", state.brokers.length, "Live or manually entered broker records"],
-    ["Listings", state.listings.length, "Inventory attached to this workspace"],
-    ["Campaigns", state.campaigns.length, "Campaigns visible in the browser"],
-    ["Hot Leads", hotResponses, "High-intent replies received"],
-    ["Closed Deals", closedDeals, "Deals marked as won"],
-    ["Deal Value", formatCurrency(totalDealValue), "Aggregate tracked value"]
+    ["Campaigns", stats.total_campaigns, "Campaigns in this workspace"],
+    ["Sent", stats.total_sent, "Messages marked sent"],
+    ["Failed", stats.total_failed, "Failed delivery attempts"],
+    ["Skipped", stats.total_skipped, "Contacts skipped in sync logs"],
+    ["Active Devices", stats.active_devices, "Polled in the last 5 minutes"],
+    ["Broker Lists", state.contactLists.length, "Saved broadcast lists"]
   ];
 
   statsRoot.innerHTML = "";
@@ -148,207 +158,165 @@ function renderOverviewLists() {
   deviceRoot.innerHTML = "";
 
   if (!state.campaigns.length) {
-    campaignRoot.appendChild(
-      emptyState(
-        "No campaigns yet",
-        "This panel is no longer seeded with fake campaign activity. Push real campaign data from a backend or add manual entries while the sync contract is being built.",
-        "Review Setup"
-      )
-    );
+    campaignRoot.appendChild(emptyState("No campaigns yet", "Create a campaign from one of your saved broker lists."));
   } else {
-    state.campaigns.slice().reverse().forEach((campaign) => {
-      const listing = byId(state.listings, campaign.listingId);
-      campaignRoot.appendChild(
-        entityCard({
-          title: campaign.name,
-          meta: `${campaign.status} • ${campaign.sent}/${campaign.total} sent`,
-          body: listing ? `${listing.name}, ${listing.city}` : "No listing attached",
-          tag: campaign.createdAt
-        })
-      );
+    state.campaigns.slice(0, 8).forEach((campaign) => {
+      const done = Number(campaign.sent_count || 0) + Number(campaign.failed_count || 0) + Number(campaign.skipped_count || 0);
+      campaignRoot.appendChild(entityCard({
+        title: campaign.name,
+        meta: `${campaign.status} • ${done}/${campaign.total_contacts || 0} processed`,
+        body: `Sent ${campaign.sent_count || 0} • Failed ${campaign.failed_count || 0} • Skipped ${campaign.skipped_count || 0}`,
+        tag: new Date(campaign.created_at).toLocaleDateString("en-IN")
+      }));
     });
   }
 
-  if (!state.devices.length) {
-    deviceRoot.appendChild(
-      emptyState(
-        "No devices connected",
-        "Android execution devices will appear here once a real registration and sync endpoint exists. The current Android API client in this repo still returns empty results.",
-        ""
-      )
-    );
+  const stats = state.stats;
+  if (!stats?.total_devices) {
+    deviceRoot.appendChild(emptyState("No devices registered", "Devices will appear once the Android client registers with the backend."));
   } else {
-    state.devices.forEach((device) => {
-      deviceRoot.appendChild(
-        entityCard({
-          title: device.name,
-          meta: `${device.status} • Battery ${device.battery}`,
-          body: `Last seen ${device.lastSeen}`,
-          tag: "Android"
-        })
-      );
-    });
+    deviceRoot.appendChild(entityCard({
+      title: `${stats.active_devices} active of ${stats.total_devices}`,
+      meta: "Live device count",
+      body: "Detailed per-device metadata is not exposed by the current dashboard endpoint.",
+      tag: "Android"
+    }));
   }
 }
 
-function renderCollection(rootId, items, mapper, emptyTitle, emptyText, emptyAction = "") {
-  const root = document.getElementById(rootId);
+function renderBrokerLists() {
+  const root = document.getElementById("broker-list");
   root.innerHTML = "";
 
-  if (!items.length) {
-    root.appendChild(emptyState(emptyTitle, emptyText, emptyAction));
+  if (!state.contactLists.length) {
+    root.appendChild(emptyState("No broker lists yet", "Import a broker list or add a broker manually into a named list."));
     return;
   }
 
-  items.forEach((item) => root.appendChild(mapper(item)));
-}
-
-function renderBrokers() {
-  renderCollection(
-    "broker-list",
-    state.brokers,
-    (broker) =>
-      entityCard({
-        title: broker.name,
-        meta: broker.phone,
-        body: broker.locality || "No locality added",
-        tag: "Broker"
-      }),
-    "No brokers yet",
-    "Start with a real broker list, or add a few manually for testing while the shared backend is being designed."
-  );
-}
-
-function renderListings() {
-  renderCollection(
-    "listing-list",
-    state.listings,
-    (listing) =>
-      entityCard({
-        title: listing.name,
-        meta: listing.city,
-        body: listing.project || "No project tag",
-        tag: "Listing"
-      }),
-    "No listings yet",
-    "Listings should come from the same data source as your broker operations. Right now this web app has no live PropAI or WaBro inventory connection."
-  );
+  state.contactLists.forEach((list) => {
+    root.appendChild(entityCard({
+      title: list.name,
+      meta: `${list.count} brokers`,
+      body: "Reusable contact list for WaBro campaigns",
+      tag: "List"
+    }));
+  });
 }
 
 function renderCampaignOptions() {
-  const listingSelect = document.getElementById("campaign-listing-select");
-  const deviceSelect = document.getElementById("campaign-device-select");
-
-  listingSelect.innerHTML = `<option value="">Choose listing</option>`;
-  deviceSelect.innerHTML = `<option value="">Choose device</option>`;
-
-  state.listings.forEach((listing) => {
+  const select = document.getElementById("campaign-contact-list-select");
+  select.innerHTML = `<option value="">Choose broker list</option>`;
+  state.contactLists.forEach((list) => {
     const option = document.createElement("option");
-    option.value = listing.id;
-    option.textContent = `${listing.name} • ${listing.city}`;
-    listingSelect.appendChild(option);
-  });
-
-  state.devices.forEach((device) => {
-    const option = document.createElement("option");
-    option.value = device.id;
-    option.textContent = `${device.name} • ${device.status}`;
-    deviceSelect.appendChild(option);
+    option.value = list.name;
+    option.textContent = `${list.name} • ${list.count} brokers`;
+    select.appendChild(option);
   });
 }
 
 function renderCampaigns() {
-  renderCollection(
-    "campaign-list",
-    state.campaigns,
-    (campaign) => {
-      const listing = byId(state.listings, campaign.listingId);
-      const device = byId(state.devices, campaign.deviceId);
-      return entityCard({
-        title: campaign.name,
-        meta: `${campaign.status} • ${campaign.sent}/${campaign.total} sent`,
-        body: `${listing ? listing.name : "No listing"} • ${device ? device.name : "No device"}`,
-        tag: "Campaign"
-      });
-    },
-    "No campaigns created",
-    "This screen is ready for real campaign orchestration, but the Android-side API client is still a stub and there is no server contract in this repo yet."
-  );
-}
-
-function renderDevices() {
-  renderCollection(
-    "device-list",
-    state.devices,
-    (device) =>
-      entityCard({
-        title: device.name,
-        meta: `${device.status} • ${device.battery}`,
-        body: `Last seen ${device.lastSeen}`,
-        tag: "Device"
-      }),
-    "No devices available",
-    "Device visibility depends on backend registration and polling APIs. Those endpoints are not implemented in this repository today."
-  );
-}
-
-function responseClass(intent) {
-  if (intent === "HOT") return "status-hot";
-  if (intent === "WARM") return "status-warm";
-  return "status-cold";
-}
-
-function renderResponses() {
-  const root = document.getElementById("response-list");
+  const root = document.getElementById("campaign-list");
   root.innerHTML = "";
 
-  if (!state.responses.length) {
-    root.appendChild(
-      emptyState(
-        "No broker responses yet",
-        "Response analytics will stay empty until campaign execution and response ingestion are connected to a real backend.",
-        ""
-      )
-    );
+  if (!state.campaigns.length) {
+    root.appendChild(emptyState("No campaigns created", "Create a campaign from one of your imported broker lists."));
     return;
   }
 
-  state.responses
-    .slice()
-    .sort((a, b) => Number(b.hotLeadScore) - Number(a.hotLeadScore))
-    .forEach((response) => {
-      const campaign = byId(state.campaigns, response.campaignId);
-      const card = document.createElement("article");
-      card.className = "response-card";
-      card.innerHTML = `
-        <div class="response-head">
-          <div>
-            <div class="response-tag ${responseClass(response.intentLevel)}">${response.intentLevel}</div>
-            <h4>${response.brokerName || response.brokerPhone}</h4>
-            <p class="response-meta">${campaign ? campaign.name : "Unassigned campaign"} • Score ${response.hotLeadScore}</p>
-          </div>
-          <div class="response-meta">${response.dealClosed ? "Deal closed" : response.followUpSent ? "Follow-up done" : "Action pending"}</div>
-        </div>
-        <p class="entity-meta">${response.responseText}</p>
-        <div class="response-actions">
-          ${response.followUpSent ? `<span class="secondary-btn">Follow-up sent</span>` : `<button class="secondary-btn" data-action="followup" data-id="${response.id}">Mark follow-up</button>`}
-          ${response.dealClosed ? `<span class="secondary-btn">${formatCurrency(response.dealValue)}</span>` : `<input type="number" min="0" step="1" placeholder="Deal value" data-input="dealValue" data-id="${response.id}" /><button class="primary-btn" data-action="deal" data-id="${response.id}">Close deal</button>`}
-        </div>
-      `;
-      root.appendChild(card);
-    });
+  state.campaigns.forEach((campaign) => {
+    const done = Number(campaign.sent_count || 0) + Number(campaign.failed_count || 0) + Number(campaign.skipped_count || 0);
+    root.appendChild(entityCard({
+      title: campaign.name,
+      meta: `${campaign.status} • ${done}/${campaign.total_contacts || 0} processed`,
+      body: `Sent ${campaign.sent_count || 0} • Failed ${campaign.failed_count || 0} • Skipped ${campaign.skipped_count || 0}`,
+      tag: "Campaign"
+    }));
+  });
+}
+
+function renderDevices() {
+  const root = document.getElementById("device-list");
+  root.innerHTML = "";
+
+  const stats = state.stats;
+  if (!stats?.total_devices) {
+    root.appendChild(emptyState("No devices registered", "Open the WaBro Android client and connect it to this backend account."));
+    return;
+  }
+
+  root.appendChild(entityCard({
+    title: `${stats.total_devices} registered devices`,
+    meta: `${stats.active_devices} active recently`,
+    body: "This backend currently exposes device counts through dashboard stats, not full device cards.",
+    tag: "Device"
+  }));
 }
 
 function rerender() {
   renderStats();
   renderOverviewLists();
-  renderBrokers();
-  renderListings();
+  renderBrokerLists();
   renderCampaignOptions();
   renderCampaigns();
   renderDevices();
-  renderResponses();
-  saveState();
+}
+
+async function loadDashboard() {
+  const [me, dashboard, campaigns, lists] = await Promise.all([
+    apiFetch("/auth/me"),
+    apiFetch("/wabro/dashboard/stats"),
+    apiFetch("/wabro/campaigns"),
+    apiFetch("/wabro/contacts")
+  ]);
+
+  state.user = me?.user || me?.profile || null;
+  state.stats = dashboard?.stats || null;
+  state.campaigns = Array.isArray(campaigns?.campaigns) ? campaigns.campaigns : [];
+  state.contactLists = Array.isArray(lists?.lists) ? lists.lists : [];
+
+  document.getElementById("user-email").textContent = state.user?.email || state.session?.email || "";
+  rerender();
+}
+
+async function login(email, password) {
+  const response = await fetch(`${apiBase}/auth/password`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ mode: "signin", email, password })
+  });
+
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || !data?.session?.access_token) {
+    throw new Error(data.error || "Login failed");
+  }
+
+  state.session = {
+    email: data?.user?.email || email,
+    token: data.session.access_token,
+    refreshToken: data.session.refresh_token,
+    expiresAt: data.session.expires_at ? data.session.expires_at * 1000 : data.session.expires_in ? Date.now() + Number(data.session.expires_in) * 1000 : undefined
+  };
+  saveStoredSession(state.session);
+}
+
+function showApp() {
+  document.getElementById("auth-screen").classList.add("hidden");
+  document.getElementById("app-shell").classList.remove("hidden");
+}
+
+function showAuth() {
+  document.getElementById("app-shell").classList.add("hidden");
+  document.getElementById("auth-screen").classList.remove("hidden");
+}
+
+function logout() {
+  state.session = null;
+  state.user = null;
+  state.stats = null;
+  state.campaigns = [];
+  state.contactLists = [];
+  clearStoredSession();
+  showAuth();
 }
 
 function activateSection(sectionId) {
@@ -358,6 +326,18 @@ function activateSection(sectionId) {
   document.querySelectorAll(".page").forEach((page) => {
     page.classList.toggle("active", page.id === sectionId);
   });
+}
+
+function parseBrokerBulkText(input) {
+  return String(input || "")
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const [name = "", phone = "", locality = ""] = line.split(",").map((part) => part.trim());
+      return { name, phone, locality };
+    })
+    .filter((broker) => broker.name && broker.phone);
 }
 
 document.querySelectorAll(".nav-link").forEach((button) => {
@@ -371,98 +351,123 @@ document.querySelectorAll("[data-open-form]").forEach((button) => {
   });
 });
 
-document.getElementById("broker-form").addEventListener("submit", (event) => {
+document.getElementById("login-form").addEventListener("submit", async (event) => {
   event.preventDefault();
   const form = new FormData(event.currentTarget);
-  addBrokerRecord({
-    name: form.get("name").trim(),
-    phone: form.get("phone").trim(),
-    locality: form.get("locality").trim()
+  const errorEl = document.getElementById("login-error");
+  errorEl.textContent = "";
+  try {
+    await login(String(form.get("email") || ""), String(form.get("password") || ""));
+    await loadDashboard();
+    showApp();
+  } catch (error) {
+    errorEl.textContent = error.message || "Login failed";
+  }
+});
+
+document.getElementById("logout-btn").addEventListener("click", logout);
+
+document.getElementById("broker-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const form = new FormData(event.currentTarget);
+  const listName = String(form.get("list_name") || "").trim();
+  const name = String(form.get("name") || "").trim();
+  const phone = String(form.get("phone") || "").trim();
+  const locality = String(form.get("locality") || "").trim();
+  if (!listName || !name || !phone) return;
+
+  await apiFetch("/wabro/contacts", {
+    method: "POST",
+    body: JSON.stringify({
+      list_name: listName,
+      contacts: [{ name, phone, locality }]
+    })
   });
+
   event.currentTarget.reset();
   event.currentTarget.classList.add("hidden");
-  rerender();
+  await loadDashboard();
 });
 
 document.getElementById("broker-file").addEventListener("change", async (event) => {
   const file = event.currentTarget.files?.[0];
   if (!file) return;
-
-  const text = await file.text();
-  const input = document.getElementById("broker-bulk-input");
-  input.value = text;
+  document.getElementById("broker-bulk-input").value = await file.text();
 });
 
-document.getElementById("broker-import-btn").addEventListener("click", () => {
+document.getElementById("broker-import-btn").addEventListener("click", async () => {
+  const form = document.getElementById("broker-form");
+  const listName = String(new FormData(form).get("list_name") || "").trim();
   const input = document.getElementById("broker-bulk-input");
   const status = document.getElementById("broker-import-status");
-  const { imported, total } = importBrokerList(input.value);
-  if (imported > 0) {
-    input.value = "";
-    const fileInput = document.getElementById("broker-file");
-    fileInput.value = "";
-    status.textContent = `${imported} of ${total} brokers imported. Duplicate or invalid rows were skipped.`;
-    rerender();
+  if (!listName) {
+    status.textContent = "Enter a list name before importing.";
     return;
   }
-  status.textContent = total > 0 ? "No new brokers imported. Duplicate or invalid rows were skipped." : "No valid broker rows found to import.";
-});
 
-document.getElementById("listing-form").addEventListener("submit", (event) => {
-  event.preventDefault();
-  const form = new FormData(event.currentTarget);
-  state.listings.push({
-    id: nextId(state.listings),
-    name: form.get("name").trim(),
-    city: form.get("city").trim(),
-    project: form.get("project").trim()
-  });
-  event.currentTarget.reset();
-  event.currentTarget.classList.add("hidden");
-  rerender();
-});
-
-document.getElementById("campaign-form").addEventListener("submit", (event) => {
-  event.preventDefault();
-  const form = new FormData(event.currentTarget);
-  state.campaigns.push({
-    id: nextId(state.campaigns),
-    name: form.get("name").trim(),
-    listingId: Number(form.get("listingId")),
-    deviceId: form.get("deviceId"),
-    message: form.get("message").trim(),
-    status: "DRAFT",
-    sent: 0,
-    total: state.brokers.length,
-    createdAt: "Just now"
-  });
-  event.currentTarget.reset();
-  event.currentTarget.classList.add("hidden");
-  rerender();
-});
-
-document.getElementById("response-list").addEventListener("click", (event) => {
-  const target = event.target.closest("[data-action]");
-  if (!target) return;
-
-  const responseId = Number(target.dataset.id);
-  const response = byId(state.responses, responseId);
-  if (!response) return;
-
-  if (target.dataset.action === "followup") {
-    response.followUpSent = true;
+  const contacts = parseBrokerBulkText(input.value);
+  if (!contacts.length) {
+    status.textContent = "No valid broker rows found to import.";
+    return;
   }
 
-  if (target.dataset.action === "deal") {
-    const input = document.querySelector(`[data-input="dealValue"][data-id="${responseId}"]`);
-    const value = Number(input?.value || 0);
-    if (value > 0) {
-      response.dealClosed = true;
-      response.dealValue = value;
-    }
-  }
+  await apiFetch("/wabro/contacts", {
+    method: "POST",
+    body: JSON.stringify({
+      list_name: listName,
+      contacts
+    })
+  });
 
-  rerender();
+  input.value = "";
+  document.getElementById("broker-file").value = "";
+  status.textContent = `${contacts.length} brokers imported into ${listName}.`;
+  await loadDashboard();
 });
 
-rerender();
+document.getElementById("campaign-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const form = new FormData(event.currentTarget);
+  const listName = String(form.get("listName") || "").trim();
+  const name = String(form.get("name") || "").trim();
+  const messageTemplate = String(form.get("message_template") || "").trim();
+  if (!listName || !name || !messageTemplate) return;
+
+  let contacts = state.contactsByList.get(listName);
+  if (!contacts) {
+    const data = await apiFetch(`/wabro/contacts/${encodeURIComponent(listName)}`);
+    contacts = Array.isArray(data?.contacts) ? data.contacts : [];
+    state.contactsByList.set(listName, contacts);
+  }
+
+  await apiFetch("/wabro/campaigns", {
+    method: "POST",
+    body: JSON.stringify({
+      name,
+      message_template: messageTemplate,
+      contacts: contacts.map((contact) => ({ phone: contact.phone, name: contact.name }))
+    })
+  });
+
+  event.currentTarget.reset();
+  event.currentTarget.classList.add("hidden");
+  await loadDashboard();
+});
+
+async function init() {
+  const stored = readStoredSession();
+  if (!stored?.token) {
+    showAuth();
+    return;
+  }
+
+  state.session = stored;
+  try {
+    await loadDashboard();
+    showApp();
+  } catch {
+    logout();
+  }
+}
+
+init();
