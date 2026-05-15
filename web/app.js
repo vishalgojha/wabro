@@ -1,81 +1,11 @@
-const storageKey = "wabro-control-panel-v1";
+const storageKey = "wabro-control-panel-v2";
 
 const defaultState = {
-  brokers: [
-    { id: 1, name: "Rohan Mehta", phone: "+91 98190 00111", locality: "Andheri West" },
-    { id: 2, name: "Aarti Shah", phone: "+91 98190 00222", locality: "Thane" },
-    { id: 3, name: "Imran Khan", phone: "+91 98190 00333", locality: "Navi Mumbai" }
-  ],
-  listings: [
-    { id: 1, name: "Skyline Residences", city: "Mumbai", project: "Tower A" },
-    { id: 2, name: "Palm Crest", city: "Pune", project: "Phase 2" }
-  ],
-  devices: [
-    { id: "device-01", name: "Samsung M34", status: "Active", battery: "78%", lastSeen: "2 min ago" },
-    { id: "device-02", name: "OnePlus Nord", status: "Paused", battery: "51%", lastSeen: "14 min ago" }
-  ],
-  campaigns: [
-    {
-      id: 1,
-      name: "Mumbai Launch Push",
-      listingId: 1,
-      deviceId: "device-01",
-      message: "Launching Skyline Residences this week. Interested brokers reply for deck and pricing.",
-      status: "RUNNING",
-      sent: 88,
-      total: 120,
-      createdAt: "Today"
-    },
-    {
-      id: 2,
-      name: "Pune Investor Update",
-      listingId: 2,
-      deviceId: "device-02",
-      message: "Palm Crest investor inventory available. Reply if you want unit sheet and commission details.",
-      status: "PAUSED",
-      sent: 45,
-      total: 90,
-      createdAt: "Yesterday"
-    }
-  ],
-  responses: [
-    {
-      id: 1,
-      campaignId: 1,
-      brokerName: "Rohan Mehta",
-      brokerPhone: "+91 98190 00111",
-      intentLevel: "HOT",
-      responseText: "Send pricing and site visit slot for Saturday.",
-      hotLeadScore: 92,
-      followUpSent: false,
-      dealClosed: false,
-      dealValue: 0
-    },
-    {
-      id: 2,
-      campaignId: 1,
-      brokerName: "Aarti Shah",
-      brokerPhone: "+91 98190 00222",
-      intentLevel: "WARM",
-      responseText: "Need commission structure before I share with clients.",
-      hotLeadScore: 67,
-      followUpSent: true,
-      dealClosed: false,
-      dealValue: 0
-    },
-    {
-      id: 3,
-      campaignId: 2,
-      brokerName: "Imran Khan",
-      brokerPhone: "+91 98190 00333",
-      intentLevel: "HOT",
-      responseText: "I have one investor, closeable this week if payment plan works.",
-      hotLeadScore: 89,
-      followUpSent: false,
-      dealClosed: true,
-      dealValue: 12500000
-    }
-  ]
+  brokers: [],
+  listings: [],
+  devices: [],
+  campaigns: [],
+  responses: []
 };
 
 let state = loadState();
@@ -105,6 +35,33 @@ function formatCurrency(value) {
   return `Rs ${Number(value || 0).toLocaleString("en-IN")}`;
 }
 
+function emptyState(title, text, actionLabel) {
+  const card = document.createElement("article");
+  card.className = "empty-state";
+  card.innerHTML = `
+    <div class="eyebrow">No live data</div>
+    <h4>${title}</h4>
+    <p>${text}</p>
+    ${actionLabel ? `<button class="secondary-btn" type="button">${actionLabel}</button>` : ""}
+  `;
+  if (actionLabel) {
+    card.querySelector("button").addEventListener("click", () => window.scrollTo({ top: 0, behavior: "smooth" }));
+  }
+  return card;
+}
+
+function entityCard({ title, meta, body, tag }) {
+  const card = document.createElement("article");
+  card.className = "entity-card";
+  card.innerHTML = `
+    <div class="entity-tag">${tag}</div>
+    <h4>${title}</h4>
+    <p class="entity-meta">${meta}</p>
+    <p class="entity-meta">${body}</p>
+  `;
+  return card;
+}
+
 function renderStats() {
   const statsRoot = document.getElementById("overview-stats");
   const template = document.getElementById("stat-card-template");
@@ -113,12 +70,12 @@ function renderStats() {
   const totalDealValue = state.responses.reduce((sum, item) => sum + Number(item.dealValue || 0), 0);
 
   const cards = [
-    ["Brokers", state.brokers.length, "Active broker records"],
-    ["Listings", state.listings.length, "Campaign-ready inventory"],
-    ["Campaigns", state.campaigns.length, "Managed from web"],
-    ["Hot Leads", hotResponses, "High-intent replies"],
-    ["Closed Deals", closedDeals, "Converted from responses"],
-    ["Deal Value", formatCurrency(totalDealValue), "Tracked from browser"]
+    ["Brokers", state.brokers.length, "Live or manually entered broker records"],
+    ["Listings", state.listings.length, "Inventory attached to this workspace"],
+    ["Campaigns", state.campaigns.length, "Campaigns visible in the browser"],
+    ["Hot Leads", hotResponses, "High-intent replies received"],
+    ["Closed Deals", closedDeals, "Deals marked as won"],
+    ["Deal Value", formatCurrency(totalDealValue), "Aggregate tracked value"]
   ];
 
   statsRoot.innerHTML = "";
@@ -136,63 +93,94 @@ function renderOverviewLists() {
   const deviceRoot = document.getElementById("device-health");
 
   campaignRoot.innerHTML = "";
-  state.campaigns.slice().reverse().forEach((campaign) => {
-    const listing = byId(state.listings, campaign.listingId);
-    campaignRoot.appendChild(entityCard({
-      title: campaign.name,
-      meta: `${campaign.status} • ${campaign.sent}/${campaign.total} sent`,
-      body: listing ? `${listing.name}, ${listing.city}` : "No listing attached",
-      tag: campaign.createdAt
-    }));
-  });
-
   deviceRoot.innerHTML = "";
-  state.devices.forEach((device) => {
-    deviceRoot.appendChild(entityCard({
-      title: device.name,
-      meta: `${device.status} • Battery ${device.battery}`,
-      body: `Last seen ${device.lastSeen}`,
-      tag: "Android"
-    }));
-  });
+
+  if (!state.campaigns.length) {
+    campaignRoot.appendChild(
+      emptyState(
+        "No campaigns yet",
+        "This panel is no longer seeded with fake campaign activity. Push real campaign data from a backend or add manual entries while the sync contract is being built.",
+        "Review Setup"
+      )
+    );
+  } else {
+    state.campaigns.slice().reverse().forEach((campaign) => {
+      const listing = byId(state.listings, campaign.listingId);
+      campaignRoot.appendChild(
+        entityCard({
+          title: campaign.name,
+          meta: `${campaign.status} • ${campaign.sent}/${campaign.total} sent`,
+          body: listing ? `${listing.name}, ${listing.city}` : "No listing attached",
+          tag: campaign.createdAt
+        })
+      );
+    });
+  }
+
+  if (!state.devices.length) {
+    deviceRoot.appendChild(
+      emptyState(
+        "No devices connected",
+        "Android execution devices will appear here once a real registration and sync endpoint exists. The current Android API client in this repo still returns empty results.",
+        ""
+      )
+    );
+  } else {
+    state.devices.forEach((device) => {
+      deviceRoot.appendChild(
+        entityCard({
+          title: device.name,
+          meta: `${device.status} • Battery ${device.battery}`,
+          body: `Last seen ${device.lastSeen}`,
+          tag: "Android"
+        })
+      );
+    });
+  }
 }
 
-function entityCard({ title, meta, body, tag }) {
-  const card = document.createElement("article");
-  card.className = "entity-card";
-  card.innerHTML = `
-    <div class="entity-tag">${tag}</div>
-    <h4>${title}</h4>
-    <p class="entity-meta">${meta}</p>
-    <p class="entity-meta">${body}</p>
-  `;
-  return card;
+function renderCollection(rootId, items, mapper, emptyTitle, emptyText, emptyAction = "") {
+  const root = document.getElementById(rootId);
+  root.innerHTML = "";
+
+  if (!items.length) {
+    root.appendChild(emptyState(emptyTitle, emptyText, emptyAction));
+    return;
+  }
+
+  items.forEach((item) => root.appendChild(mapper(item)));
 }
 
 function renderBrokers() {
-  const root = document.getElementById("broker-list");
-  root.innerHTML = "";
-  state.brokers.forEach((broker) => {
-    root.appendChild(entityCard({
-      title: broker.name,
-      meta: broker.phone,
-      body: broker.locality || "No locality added",
-      tag: "Broker"
-    }));
-  });
+  renderCollection(
+    "broker-list",
+    state.brokers,
+    (broker) =>
+      entityCard({
+        title: broker.name,
+        meta: broker.phone,
+        body: broker.locality || "No locality added",
+        tag: "Broker"
+      }),
+    "No brokers yet",
+    "Start with a real broker list, or add a few manually for testing while the shared backend is being designed."
+  );
 }
 
 function renderListings() {
-  const root = document.getElementById("listing-list");
-  root.innerHTML = "";
-  state.listings.forEach((listing) => {
-    root.appendChild(entityCard({
-      title: listing.name,
-      meta: listing.city,
-      body: listing.project || "No project tag",
-      tag: "Listing"
-    }));
-  });
+  renderCollection(
+    "listing-list",
+    state.listings,
+    (listing) =>
+      entityCard({
+        title: listing.name,
+        meta: listing.city,
+        body: listing.project || "No project tag",
+        tag: "Listing"
+      }),
+    "No listings yet",
+    "Listings should come from the same data source as your broker operations. Right now this web app has no live PropAI or WaBro inventory connection."
+  );
 }
 
 function renderCampaignOptions() {
@@ -218,31 +206,38 @@ function renderCampaignOptions() {
 }
 
 function renderCampaigns() {
-  const root = document.getElementById("campaign-list");
-  root.innerHTML = "";
-  state.campaigns.forEach((campaign) => {
-    const listing = byId(state.listings, campaign.listingId);
-    const device = byId(state.devices, campaign.deviceId);
-    root.appendChild(entityCard({
-      title: campaign.name,
-      meta: `${campaign.status} • ${campaign.sent}/${campaign.total} sent`,
-      body: `${listing ? listing.name : "No listing"} • ${device ? device.name : "No device"}`,
-      tag: "Campaign"
-    }));
-  });
+  renderCollection(
+    "campaign-list",
+    state.campaigns,
+    (campaign) => {
+      const listing = byId(state.listings, campaign.listingId);
+      const device = byId(state.devices, campaign.deviceId);
+      return entityCard({
+        title: campaign.name,
+        meta: `${campaign.status} • ${campaign.sent}/${campaign.total} sent`,
+        body: `${listing ? listing.name : "No listing"} • ${device ? device.name : "No device"}`,
+        tag: "Campaign"
+      });
+    },
+    "No campaigns created",
+    "This screen is ready for real campaign orchestration, but the Android-side API client is still a stub and there is no server contract in this repo yet."
+  );
 }
 
 function renderDevices() {
-  const root = document.getElementById("device-list");
-  root.innerHTML = "";
-  state.devices.forEach((device) => {
-    root.appendChild(entityCard({
-      title: device.name,
-      meta: `${device.status} • ${device.battery}`,
-      body: `Last seen ${device.lastSeen}`,
-      tag: "Device"
-    }));
-  });
+  renderCollection(
+    "device-list",
+    state.devices,
+    (device) =>
+      entityCard({
+        title: device.name,
+        meta: `${device.status} • ${device.battery}`,
+        body: `Last seen ${device.lastSeen}`,
+        tag: "Device"
+      }),
+    "No devices available",
+    "Device visibility depends on backend registration and polling APIs. Those endpoints are not implemented in this repository today."
+  );
 }
 
 function responseClass(intent) {
@@ -254,6 +249,17 @@ function responseClass(intent) {
 function renderResponses() {
   const root = document.getElementById("response-list");
   root.innerHTML = "";
+
+  if (!state.responses.length) {
+    root.appendChild(
+      emptyState(
+        "No broker responses yet",
+        "Response analytics will stay empty until campaign execution and response ingestion are connected to a real backend.",
+        ""
+      )
+    );
+    return;
+  }
 
   state.responses
     .slice()
@@ -271,7 +277,7 @@ function renderResponses() {
           </div>
           <div class="response-meta">${response.dealClosed ? "Deal closed" : response.followUpSent ? "Follow-up done" : "Action pending"}</div>
         </div>
-        <p class="response-text">${response.responseText}</p>
+        <p class="entity-meta">${response.responseText}</p>
         <div class="response-actions">
           ${response.followUpSent ? `<span class="secondary-btn">Follow-up sent</span>` : `<button class="secondary-btn" data-action="followup" data-id="${response.id}">Mark follow-up</button>`}
           ${response.dealClosed ? `<span class="secondary-btn">${formatCurrency(response.dealValue)}</span>` : `<input type="number" min="0" step="1" placeholder="Deal value" data-input="dealValue" data-id="${response.id}" /><button class="primary-btn" data-action="deal" data-id="${response.id}">Close deal</button>`}
