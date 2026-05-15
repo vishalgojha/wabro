@@ -2,6 +2,11 @@
 
 Send bulk WhatsApp messages with human-like timing. Built for real estate brokers, agents, and sales teams.
 
+WaBro now has two product surfaces:
+
+- Android app as the WhatsApp execution client
+- Web control panel served at `/app/` for brokers, listings, campaigns, device status, and response tracking
+
 ## Features
 
 - **Bulk WhatsApp Broadcast** — Send personalised messages to thousands of contacts automatically
@@ -19,6 +24,7 @@ Send bulk WhatsApp messages with human-like timing. Built for real estate broker
 [Download APK (v1.0.0)](https://github.com/vishalgojha/wabro/releases/download/v1.0.0/WaBro_v1.0.0_signed.apk)
 
 Landing page: [https://vishalgojha.github.io/wabro/](https://vishalgojha.github.io/wabro/)
+Web control panel: `/app/` on the deployed domain
 
 ## Requirements
 

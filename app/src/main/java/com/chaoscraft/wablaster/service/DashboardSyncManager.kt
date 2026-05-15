@@ -11,6 +11,8 @@ import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.chaoscraft.wablaster.R
+import com.chaoscraft.wablaster.V2MainActivity
+import com.chaoscraft.wablaster.util.PendingCampaign
 import com.chaoscraft.wablaster.util.WaBroApiClient
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.*
@@ -22,10 +24,10 @@ class DashboardSyncManager : Service() {
     companion object {
         private const val TAG = "DashboardSyncManager"
         private const val CHANNEL_ID = "WaBroSyncChannel"
-        private const val NOTIFICATION_ID = 1001
-        
-        private const val POLLING_INTERVAL_MS = 30_000L // 30 seconds
-        
+        private const val NOTIFICATION_ID = 1002
+
+        private const val POLLING_INTERVAL_MS = 30_000L
+
         fun start(context: Context) {
             val intent = Intent(context, DashboardSyncManager::class.java)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -72,8 +74,11 @@ class DashboardSyncManager : Service() {
         stopPolling()
         scope.cancel()
     }
-    
+
     private fun startPolling() {
+        if (pollingJob?.isActive == true) {
+            return
+        }
         pollingJob = scope.launch {
             while (isActive) {
                 try {
@@ -140,7 +145,7 @@ class DashboardSyncManager : Service() {
         // 3. Handle contact processing
         // 4. Upload logs via syncSendLogs
     }
-    
+
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
@@ -155,12 +160,23 @@ class DashboardSyncManager : Service() {
             notificationManager.createNotificationChannel(channel)
         }
     }
-    
+
     private fun createNotification(): Notification {
+        val openIntent = Intent(this, V2MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        }
+        val pendingIntent = android.app.PendingIntent.getActivity(
+            this,
+            0,
+            openIntent,
+            android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE
+        )
+
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("WaBro Sync")
             .setContentText("Monitoring for campaigns...")
             .setSmallIcon(R.drawable.ic_notification)
+            .setContentIntent(pendingIntent)
             .setOngoing(true)
             .build()
     }

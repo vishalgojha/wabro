@@ -13,3 +13,7 @@ keystore.properties
 app/build/
 landing/WaBro.apk
 *.apk
+.android/
+.android-sdk/
+.gradle-local/
+.jdk/

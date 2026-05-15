@@ -25,6 +25,7 @@ import com.chaoscraft.wablaster.engine.SkillPipeline
 import com.chaoscraft.wablaster.engine.SkillsConfig
 import com.chaoscraft.wablaster.service.AccessibilityBridge
 import com.chaoscraft.wablaster.util.SenderConfig
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -59,9 +60,9 @@ class CampaignManager @Inject constructor(
 
     // V2: Track campaign-to-listing mapping
     private val _campaignListingMap = mutableMapOf<Long, Long>() // campaignId -> listingId
+    private val managerScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var campaignScope: CoroutineScope? = null
     private var currentCampaignId: Long = 0
-    private val campaignRunningKey: String get() = "campaign_${currentCampaignId}_running"
 
     /**
      * Associate a listing with a campaign for response tracking.
@@ -81,8 +82,9 @@ class CampaignManager @Inject constructor(
         currentCampaignId = campaignId
         listingId?.let { _campaignListingMap[campaignId] = it }
 
+        campaignScope?.cancel()
         startForegroundService()
-        prefs.edit().putBoolean(campaignRunningKey, true).apply()
+        prefs.edit().putBoolean(campaignRunningKey(campaignId), true).apply()
 
         campaignDao.updateStatus(campaignId, CampaignStatus.RUNNING)
         _stats.value = CampaignStats(
@@ -92,26 +94,7 @@ class CampaignManager @Inject constructor(
             isPaused = false
         )
 
-        campaignScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-        campaignScope?.launch {
-            try {
-                executeCampaign(contacts, messageTemplate, mediaUri, skillsConfig)
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                campaignDao.updateStatus(campaignId, CampaignStatus.STOPPED)
-                _stats.value = _stats.value.copy(isRunning = false)
-            } finally {
-                prefs.edit().putBoolean(campaignRunningKey, false).apply()
-                val remaining = contactDao.getPendingCount(campaignId)
-                if (remaining == 0) {
-                    campaignDao.updateStatus(campaignId, CampaignStatus.DONE)
-                }
-                if (remaining == 0 || _stats.value.isRunning == false) {
-                    stopForegroundService()
-                }
-            }
-        }
+        launchCampaignExecution(campaignId, contacts, messageTemplate, mediaUri, skillsConfig)
     }
 
     suspend fun resumeCampaign(
@@ -121,6 +104,7 @@ class CampaignManager @Inject constructor(
         skillsConfig: SkillsConfig
     ) {
         currentCampaignId = campaignId
+        campaignScope?.cancel()
         startForegroundService()
 
         val pendingContacts = contactDao.getPendingByCampaign(campaignId)
@@ -133,7 +117,7 @@ class CampaignManager @Inject constructor(
             return
         }
 
-        prefs.edit().putBoolean(campaignRunningKey, true).apply()
+        prefs.edit().putBoolean(campaignRunningKey(campaignId), true).apply()
         campaignDao.updateStatus(campaignId, CampaignStatus.RUNNING)
 
         _stats.value = CampaignStats(
@@ -144,26 +128,7 @@ class CampaignManager @Inject constructor(
             isPaused = false
         )
 
-        campaignScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-        campaignScope?.launch {
-            try {
-                executeCampaign(pendingContacts, messageTemplate, mediaUri, skillsConfig)
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                campaignDao.updateStatus(campaignId, CampaignStatus.STOPPED)
-                _stats.value = _stats.value.copy(isRunning = false)
-            } finally {
-                prefs.edit().putBoolean(campaignRunningKey, false).apply()
-                val remaining = contactDao.getPendingCount(campaignId)
-                if (remaining == 0) {
-                    campaignDao.updateStatus(campaignId, CampaignStatus.DONE)
-                }
-                if (remaining == 0 || _stats.value.isRunning == false) {
-                    stopForegroundService()
-                }
-            }
-        }
+        launchCampaignExecution(campaignId, pendingContacts, messageTemplate, mediaUri, skillsConfig)
     }
 
     /**
@@ -224,6 +189,7 @@ class CampaignManager @Inject constructor(
     }
 
     private suspend fun executeCampaign(
+        campaignId: Long,
         contacts: List<Contact>,
         messageTemplate: String,
         mediaUri: Uri?,
@@ -237,14 +203,19 @@ class CampaignManager @Inject constructor(
                 if (!_stats.value.isRunning) return
             }
 
-            val result = sendToContact(contact, messageTemplate, mediaUri, skillsConfig)
-            contactDao.markSent(contact.phone, currentCampaignId)
-            recordLog(contact, result.status, currentCampaignId)
+            val result = sendToContact(campaignId, contact, messageTemplate, mediaUri, skillsConfig)
+            if (result.status == SendStatus.SENT) {
+                contactDao.markSent(contact.phone, campaignId)
+            } else {
+                contactDao.markPending(contact.phone, campaignId)
+            }
+            recordLog(contact, result.status, campaignId)
             updateStats(result.status)
         }
     }
 
     private suspend fun sendToContact(
+        campaignId: Long,
         contact: Contact,
         messageTemplate: String,
         mediaUri: Uri?,
@@ -274,7 +245,7 @@ class CampaignManager @Inject constructor(
             Log.d(TAG, "Sending to ${contact.phone}...")
 
             val senderPkg = senderConfig.selectedPackage.ifEmpty { "com.whatsapp" }
-            val success = AccessibilityBridge.send(contact, processed, currentCampaignId, senderPkg)
+            val success = AccessibilityBridge.send(contact, processed, campaignId, senderPkg)
             Log.d(TAG, "Result for ${contact.phone}: ${if (success) "OK" else "FAIL"}")
             SendResult(if (success) SendStatus.SENT else SendStatus.FAILED)
         } catch (e: Exception) {
@@ -311,24 +282,76 @@ class CampaignManager @Inject constructor(
 
     fun pauseCampaign() {
         _stats.value = _stats.value.copy(isPaused = true)
-        kotlinx.coroutines.GlobalScope.launch(Dispatchers.IO) {
+        managerScope.launch {
             campaignDao.updateStatus(currentCampaignId, CampaignStatus.PAUSED)
         }
     }
 
     fun resumeFromPause() {
         _stats.value = _stats.value.copy(isPaused = false)
-        kotlinx.coroutines.GlobalScope.launch(Dispatchers.IO) {
+        managerScope.launch {
             campaignDao.updateStatus(currentCampaignId, CampaignStatus.RUNNING)
         }
     }
 
     fun stopCampaign() {
         _stats.value = _stats.value.copy(isRunning = false, isPaused = false)
-        prefs.edit().putBoolean(campaignRunningKey, false).apply()
+        prefs.edit().putBoolean(campaignRunningKey(currentCampaignId), false).apply()
         campaignScope?.cancel()
-        kotlinx.coroutines.GlobalScope.launch(Dispatchers.IO) {
+        managerScope.launch {
             campaignDao.updateStatus(currentCampaignId, CampaignStatus.STOPPED)
+        }
+    }
+
+    private fun launchCampaignExecution(
+        campaignId: Long,
+        contacts: List<Contact>,
+        messageTemplate: String,
+        mediaUri: Uri?,
+        skillsConfig: SkillsConfig
+    ) {
+        campaignScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        campaignScope?.launch {
+            var terminalStatus = CampaignStatus.STOPPED
+            try {
+                executeCampaign(campaignId, contacts, messageTemplate, mediaUri, skillsConfig)
+                terminalStatus = if (contactDao.getPendingCount(campaignId) == 0) {
+                    CampaignStatus.DONE
+                } else if (_stats.value.isPaused) {
+                    CampaignStatus.PAUSED
+                } else {
+                    CampaignStatus.STOPPED
+                }
+            } catch (e: CancellationException) {
+                terminalStatus = if (_stats.value.isPaused) {
+                    CampaignStatus.PAUSED
+                } else {
+                    CampaignStatus.STOPPED
+                }
+                throw e
+            } catch (e: Exception) {
+                _stats.value = _stats.value.copy(isRunning = false, isPaused = false)
+                terminalStatus = CampaignStatus.STOPPED
+            } finally {
+                finalizeCampaignRun(campaignId, terminalStatus)
+            }
+        }
+    }
+
+    private suspend fun finalizeCampaignRun(campaignId: Long, terminalStatus: String) {
+        val remaining = contactDao.getPendingCount(campaignId)
+        val finalStatus = if (remaining == 0) CampaignStatus.DONE else terminalStatus
+        val shouldBeRunning = finalStatus == CampaignStatus.RUNNING
+
+        prefs.edit().putBoolean(campaignRunningKey(campaignId), shouldBeRunning).apply()
+        campaignDao.updateStatus(campaignId, finalStatus)
+        _stats.value = _stats.value.copy(
+            isRunning = shouldBeRunning,
+            isPaused = finalStatus == CampaignStatus.PAUSED
+        )
+
+        if (finalStatus != CampaignStatus.RUNNING) {
+            stopForegroundService()
         }
     }
 
@@ -386,6 +409,8 @@ class CampaignManager @Inject constructor(
     }
 
     private data class SendResult(val status: String)
+
+    private fun campaignRunningKey(campaignId: Long): String = "campaign_${campaignId}_running"
 
     companion object {
         private const val TAG = "CampaignManager"

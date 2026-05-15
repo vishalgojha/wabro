@@ -7,11 +7,13 @@ import com.chaoscraft.wablaster.db.ListingRepository
 import com.chaoscraft.wablaster.db.entities.Deal
 import com.chaoscraft.wablaster.db.entities.Listing
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
+@OptIn(ExperimentalCoroutinesApi::class)
 class ListingViewModel @Inject constructor(
     application: Application,
     private val repository: ListingRepository
@@ -51,7 +53,11 @@ class ListingViewModel @Inject constructor(
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    fun getById(id: Long) = repository.getById(id)
+    suspend fun getById(id: Long) = repository.getById(id)
+
+    fun setSearchQuery(query: String) {
+        _searchQuery.value = query
+    }
 
     fun addOrUpdateListing(listing: Listing) {
         viewModelScope.launch {

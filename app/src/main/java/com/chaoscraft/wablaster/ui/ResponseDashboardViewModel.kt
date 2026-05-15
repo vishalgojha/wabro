@@ -3,18 +3,19 @@ package com.chaoscraft.wablaster.ui
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.chaoscraft.wablaster.db.ListingRepository
 import com.chaoscraft.wablaster.db.daos.CampaignResponseDao
 import com.chaoscraft.wablaster.db.daos.DealDao
 import com.chaoscraft.wablaster.db.daos.ListingDao
 import com.chaoscraft.wablaster.db.entities.CampaignResponse
 import com.chaoscraft.wablaster.db.entities.Deal
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
+@OptIn(ExperimentalCoroutinesApi::class)
 class ResponseDashboardViewModel @Inject constructor(
     application: Application,
     private val responseDao: CampaignResponseDao,

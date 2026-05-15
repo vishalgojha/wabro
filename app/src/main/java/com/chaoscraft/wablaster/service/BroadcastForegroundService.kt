@@ -9,8 +9,8 @@ import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
 import androidx.core.app.NotificationCompat
-import com.chaoscraft.wablaster.MainActivity
 import com.chaoscraft.wablaster.R
+import com.chaoscraft.wablaster.V2MainActivity
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 
@@ -97,8 +97,8 @@ class BroadcastForegroundService : android.app.Service() {
     }
 
     private fun buildNotification(text: String): android.app.Notification {
-        val openIntent = Intent(this, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP
+        val openIntent = Intent(this, V2MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
         }
         val pendingIntent = PendingIntent.getActivity(
             this, 0, openIntent,

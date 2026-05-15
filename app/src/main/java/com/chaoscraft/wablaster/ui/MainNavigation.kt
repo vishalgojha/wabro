@@ -2,32 +2,42 @@ package com.chaoscraft.wablaster.ui
 
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.layout.*
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
-import androidx.compose.ui.Modifier
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Icon
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.chaoscraft.wablaster.ui.NavTab
-import com.chaoscraft.wablaster.ui.NavTabs
+import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+import com.chaoscraft.wablaster.util.AiConfig
+import com.chaoscraft.wablaster.util.AppValidator
+import com.chaoscraft.wablaster.util.PaymentManager
+import com.chaoscraft.wablaster.util.SenderConfig
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainNavigation(
     senderConfig: SenderConfig,
     aiConfig: AiConfig,
-    paymentManager: com.chaoscraft.wablaster.util.PaymentManager,
+    paymentManager: PaymentManager,
     brokerViewModel: BrokerViewModel = hiltViewModel(),
     listingViewModel: ListingViewModel = hiltViewModel(),
-    campaignViewModel: CampaignViewModel = hiltViewModel(),
-    responseViewModel: ResponseDashboardViewModel = hiltViewModel()
+    campaignViewModel: CampaignViewModel = hiltViewModel()
 ) {
     val navController = rememberNavController()
+    val tabs = NavTab.allTabs
     var currentTab by remember { mutableIntStateOf(0) }
-    val tabs = NavTabs.allTabs
-
     var lastBackPressTime by remember { mutableStateOf(0L) }
     val context = LocalContext.current
 
@@ -50,49 +60,32 @@ fun MainNavigation(
             NavigationBar {
                 tabs.forEachIndexed { index, tab ->
                     NavigationBarItem(
-                        icon = {
-                            Icon(
-                                if (currentTab == index) tab.selectedIcon else tab.icon,
-                                contentDescription = tab.label
-                            )
-                        },
-                        label = { Text(tab.label) },
                         selected = currentTab == index,
                         onClick = {
-                            if (currentTab != index) {
-                                currentTab = index
-                                navController.navigate(tab.route) {
-                                    popUpTo(navController.graph.findStartDestination().id) {
-                                        saveState = true
-                                    }
-                                    launchSingleTop = true
-                                    restoreState = true
-                                }
+                            currentTab = index
+                            navController.navigate(tab.route) {
+                                popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                                launchSingleTop = true
+                                restoreState = true
                             }
-                        }
+                        },
+                        icon = { Icon(if (currentTab == index) tab.selectedIcon else tab.icon, contentDescription = tab.label) },
+                        label = { Text(tab.label) }
                     )
                 }
             }
-        },
-        modifier = Modifier.fillMaxSize()
-    ) { innerPadding ->
+        }
+    ) { padding ->
         NavHost(
             navController = navController,
-            startDestination = NavTabs.Brokers.route,
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
+            startDestination = NavTab.Brokers.route,
+            modifier = androidx.compose.ui.Modifier.fillMaxSize().padding(padding)
         ) {
-            // ===== Brokers =====
-            composable(NavTabs.Brokers.route) {
+            composable(NavTab.Brokers.route) {
                 BrokerListScreen(
                     viewModel = brokerViewModel,
-                    onBrokerClick = { broker ->
-                        navController.navigate("broker/${broker.id}")
-                    },
-                    onAddBroker = {
-                        navController.navigate("broker/edit")
-                    }
+                    onBrokerClick = { broker -> navController.navigate("broker/${broker.id}") },
+                    onAddBroker = { navController.navigate("broker/edit") }
                 )
             }
             composable("broker/{brokerId}") { backStackEntry ->
@@ -100,12 +93,8 @@ fun MainNavigation(
                 BrokerDetailScreen(
                     brokerId = brokerId,
                     viewModel = brokerViewModel,
-                    listingViewModel = listingViewModel,
-                    responseViewModel = responseViewModel,
                     onNavigateBack = { navController.popBackStack() },
-                    onEdit = { broker ->
-                        navController.navigate("broker/edit/${broker.id}")
-                    }
+                    onEdit = { broker -> navController.navigate("broker/edit/${broker.id}") }
                 )
             }
             composable("broker/edit") {
@@ -116,7 +105,7 @@ fun MainNavigation(
                 )
             }
             composable("broker/edit/{brokerId}") { backStackEntry ->
-                val brokerId = backStackEntry.arguments?.getString("brokerId")?.toLongOrNull() ?: 0L
+                val brokerId = backStackEntry.arguments?.getString("brokerId")?.toLongOrNull()
                 BrokerEditScreen(
                     viewModel = brokerViewModel,
                     brokerId = brokerId,
@@ -124,67 +113,41 @@ fun MainNavigation(
                     onCancel = { navController.popBackStack() }
                 )
             }
-
-            // ===== Listings =====
-            composable(NavTabs.Listings.route) {
+            composable(NavTab.Listings.route) {
                 ListingManagerScreen(
                     viewModel = listingViewModel,
-                    onListingClick = { listing ->
-                        navController.navigate("listing/${listing.id}")
-                    }
+                    onListingClick = { }
                 )
             }
-            composable("listing/{listingId}") { backStackEntry ->
-                val listingId = backStackEntry.arguments?.getString("listingId")?.toLongOrNull() ?: 0L
-                Text("Listing Detail: $listingId")
-            }
-
-            // ===== Campaigns =====
-            composable(NavTabs.Campaigns.route) {
+            composable(NavTab.Campaigns.route) {
                 CampaignScreen(
                     viewModel = campaignViewModel,
                     senderConfig = senderConfig,
                     aiConfig = aiConfig,
                     paymentManager = paymentManager,
-                    onNavigateToDashboard = { campaignId ->
-                        navController.navigate("campaign_detail/$campaignId")
-                    }
+                    onNavigateToDashboard = { campaignId -> navController.navigate("campaign_dashboard/$campaignId") }
                 )
             }
-
-            // ===== Dashboard =====
-            composable(NavTabs.Dashboard.route) {
-                CampaignOverviewScreen(
-                    onCampaignClick = { campaignId ->
-                        navController.navigate("campaign_detail/$campaignId")
-                    },
-                    onNavigateBack = { /* Top level, no back */ }
-                )
-            }
-            composable("campaign_detail/{campaignId}") { backStackEntry ->
+            composable("campaign_dashboard/{campaignId}") { backStackEntry ->
                 val campaignId = backStackEntry.arguments?.getString("campaignId")?.toLongOrNull() ?: 0L
                 CampaignDashboard(
                     campaignId = campaignId,
-                    viewModel = responseViewModel,
-                    onNavigateToLead = { response ->
-                        navController.navigate("lead/${response.id}")
-                    },
+                    viewModel = campaignViewModel,
                     onNavigateBack = { navController.popBackStack() }
                 )
             }
-            composable("lead/{leadId}") { backStackEntry ->
-                val leadId = backStackEntry.arguments?.getString("leadId")?.toLongOrNull() ?: 0L
-                // TODO: Wire up actual lead fetching from DB
-                Text("Lead Detail: $leadId")
+            composable(NavTab.Dashboard.route) {
+                CampaignOverviewScreen(
+                    viewModel = campaignViewModel,
+                    onCampaignClick = { campaignId -> navController.navigate("campaign_dashboard/$campaignId") },
+                    onNavigateBack = { }
+                )
             }
-
-            // ===== Settings =====
-            composable(NavTabs.Settings.route) {
-                val validator = remember { AppValidator(context) }
+            composable(NavTab.Settings.route) {
                 SettingsScreen(
                     senderConfig = senderConfig,
                     aiConfig = aiConfig,
-                    validator = validator,
+                    validator = remember { AppValidator(context) },
                     paymentManager = paymentManager
                 )
             }

@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="WaBro Control Panel for brokers, listings, campaigns, devices, and response tracking." />
+    <title>WaBro Control Panel</title>
+    <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+    <div class="shell">
+        <aside class="sidebar">
+            <div class="brand">
+                <span class="brand-mark">WB</span>
+                <div>
+                    <h1>WaBro</h1>
+                    <p>Control Panel</p>
+                </div>
+            </div>
+
+            <nav class="nav">
+                <button class="nav-link active" data-section="overview">Overview</button>
+                <button class="nav-link" data-section="brokers">Brokers</button>
+                <button class="nav-link" data-section="listings">Listings</button>
+                <button class="nav-link" data-section="campaigns">Campaigns</button>
+                <button class="nav-link" data-section="devices">Devices</button>
+                <button class="nav-link" data-section="responses">Responses</button>
+            </nav>
+
+            <div class="sidebar-card">
+                <p class="eyebrow">Execution Model</p>
+                <h2>Web manages, Android sends</h2>
+                <p>The browser is the control plane. The Android app remains the WhatsApp execution client.</p>
+            </div>
+        </aside>
+
+        <main class="main">
+            <header class="topbar">
+                <div>
+                    <p class="eyebrow">Unofficial WhatsApp stack</p>
+                    <h2>Broker campaign operations</h2>
+                </div>
+                <div class="topbar-actions">
+                    <a class="ghost-btn" href="/">Landing</a>
+                    <a class="primary-btn" href="/WaBro.apk">Download APK</a>
+                </div>
+            </header>
+
+            <section class="page active" id="overview">
+                <div class="hero-panel">
+                    <div>
+                        <p class="eyebrow">Current strategy</p>
+                        <h3>Use the web for planning and the phone for execution.</h3>
+                        <p>This control panel gives brokers a usable web product today without pretending the browser can replace Android accessibility sending.</p>
+                    </div>
+                    <div class="hero-chip-stack">
+                        <span>Campaign prep</span>
+                        <span>Lead tracking</span>
+                        <span>Device health</span>
+                    </div>
+                </div>
+
+                <div class="stats-grid" id="overview-stats"></div>
+
+                <div class="split-grid">
+                    <section class="panel">
+                        <div class="panel-head">
+                            <div>
+                                <p class="eyebrow">Recent campaigns</p>
+                                <h3>Latest activity</h3>
+                            </div>
+                        </div>
+                        <div id="recent-campaigns" class="stack-list"></div>
+                    </section>
+
+                    <section class="panel">
+                        <div class="panel-head">
+                            <div>
+                                <p class="eyebrow">Execution devices</p>
+                                <h3>Android health</h3>
+                            </div>
+                        </div>
+                        <div id="device-health" class="stack-list"></div>
+                    </section>
+                </div>
+            </section>
+
+            <section class="page" id="brokers">
+                <div class="section-head">
+                    <div>
+                        <p class="eyebrow">CRM base</p>
+                        <h3>Brokers</h3>
+                    </div>
+                    <button class="primary-btn" data-open-form="broker-form">Add broker</button>
+                </div>
+
+                <form class="inline-form hidden" id="broker-form">
+                    <input type="text" name="name" placeholder="Broker name" required />
+                    <input type="text" name="phone" placeholder="Phone / WhatsApp" required />
+                    <input type="text" name="locality" placeholder="Locality" />
+                    <button type="submit" class="primary-btn">Save broker</button>
+                </form>
+
+                <div id="broker-list" class="entity-grid"></div>
+            </section>
+
+            <section class="page" id="listings">
+                <div class="section-head">
+                    <div>
+                        <p class="eyebrow">Inventory</p>
+                        <h3>Listings</h3>
+                    </div>
+                    <button class="primary-btn" data-open-form="listing-form">Add listing</button>
+                </div>
+
+                <form class="inline-form hidden" id="listing-form">
+                    <input type="text" name="name" placeholder="Listing name" required />
+                    <input type="text" name="city" placeholder="City" required />
+                    <input type="text" name="project" placeholder="Project" />
+                    <button type="submit" class="primary-btn">Save listing</button>
+                </form>
+
+                <div id="listing-list" class="entity-grid"></div>
+            </section>
+
+            <section class="page" id="campaigns">
+                <div class="section-head">
+                    <div>
+                        <p class="eyebrow">Operations</p>
+                        <h3>Campaigns</h3>
+                    </div>
+                    <button class="primary-btn" data-open-form="campaign-form">Create campaign</button>
+                </div>
+
+                <form class="inline-form hidden campaign-form" id="campaign-form">
+                    <input type="text" name="name" placeholder="Campaign name" required />
+                    <select name="listingId" required id="campaign-listing-select"></select>
+                    <select name="deviceId" required id="campaign-device-select"></select>
+                    <textarea name="message" placeholder="Campaign message" rows="4" required></textarea>
+                    <button type="submit" class="primary-btn">Save campaign</button>
+                </form>
+
+                <div id="campaign-list" class="entity-grid"></div>
+            </section>
+
+            <section class="page" id="devices">
+                <div class="section-head">
+                    <div>
+                        <p class="eyebrow">Execution layer</p>
+                        <h3>Linked Android devices</h3>
+                    </div>
+                </div>
+                <div id="device-list" class="entity-grid"></div>
+            </section>
+
+            <section class="page" id="responses">
+                <div class="section-head">
+                    <div>
+                        <p class="eyebrow">Pipeline</p>
+                        <h3>Lead responses</h3>
+                    </div>
+                </div>
+                <div id="response-list" class="response-list"></div>
+            </section>
+        </main>
+    </div>
+
+    <template id="stat-card-template">
+        <article class="stat-card">
+            <p class="stat-label"></p>
+            <strong class="stat-value"></strong>
+            <span class="stat-note"></span>
+        </article>
+    </template>
+
+    <script type="module" src="./app.js"></script>
+</body>
+</html>

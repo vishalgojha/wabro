@@ -1,28 +1,20 @@
-package com.chaoscraft.wablaster.ui
+package com.chaoscraft.wablaster
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
-import androidx.activity.compose.setContent
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import com.chaoscraft.wablaster.ui.theme.WaBlasterTheme
 
 /**
- * V2 Entry point — replaces MainActivity for the broker-focused rebuild.
- * Uses 5-tab navigation: Brokers | Listings | Campaigns | Dashboard | Settings
+ * Transitional launcher shim retained for compatibility while V2MainActivity is canonical.
  */
 class V2LaunchActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // Note: MainNavigation handles V2MainActivity internally via DI composition
-        // For initial launch, start with V2MainActivity via manifest intent-filter
-        setContent {
-            WaBlasterTheme {
-                Surface(color = MaterialTheme.colorScheme.background) {
-                    // Launch is handled via AndroidManifest intent-filter on V2MainActivity
-                }
+        startActivity(
+            Intent(this, V2MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
             }
-        }
+        )
         finish()
     }
 }

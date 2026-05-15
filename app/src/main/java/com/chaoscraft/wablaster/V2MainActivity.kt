@@ -35,7 +35,7 @@ class V2MainActivity : ComponentActivity() {
         setContent {
             WaBroV2Theme {
                 Surface(
-                    modifier = androidx.compose.foundation.layout.fillMaxSize(),
+                    modifier = androidx.compose.ui.Modifier.fillMaxSize(),
                     color = androidx.compose.material3.MaterialTheme.colorScheme.background
                 ) {
                     if (!paymentManager.isUnlocked) {

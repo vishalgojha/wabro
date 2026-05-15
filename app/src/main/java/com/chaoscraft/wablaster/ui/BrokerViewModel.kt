@@ -7,11 +7,13 @@ import com.chaoscraft.wablaster.db.BrokerRepository
 import com.chaoscraft.wablaster.db.entities.Broker
 import com.chaoscraft.wablaster.db.entities.BrokerGroup
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
+@OptIn(ExperimentalCoroutinesApi::class)
 class BrokerViewModel @Inject constructor(
     application: Application,
     private val repository: BrokerRepository
@@ -132,6 +134,5 @@ class BrokerViewModel @Inject constructor(
     }
 
     // Stats
-    val totalBrokerCount = repository.count()
     val totalBrokerCountFlow = repository.allBrokers.map { it.size }
 }

@@ -16,22 +16,34 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
+import com.chaoscraft.wablaster.db.entities.CampaignResponse
 import com.chaoscraft.wablaster.db.entities.SendLog
+import com.chaoscraft.wablaster.db.entities.CampaignStatus
 import com.chaoscraft.wablaster.db.entities.SendStatus
 import com.chaoscraft.wablaster.util.LogExporter
 
 @Composable
 fun CampaignDashboard(
-    viewModel: CampaignViewModel,
+    campaignId: Long,
+    viewModel: CampaignViewModel = hiltViewModel(),
     onNavigateBack: () -> Unit
 ) {
-    val stats by viewModel.stats.collectAsState()
-    val recentLogs by viewModel.recentLogs.collectAsState()
+    val stats by viewModel.dashboardStats.collectAsState()
+    val outcomeStats by viewModel.dashboardOutcomeStats.collectAsState()
+    val topResponses by viewModel.dashboardTopResponses.collectAsState()
+    val recentLogs by viewModel.dashboardLogs.collectAsState()
+    val campaign by viewModel.dashboardCampaign.collectAsState()
+    val runningCampaign by viewModel.runningCampaign.collectAsState()
     val context = LocalContext.current
     val view = LocalView.current
+    LaunchedEffect(campaignId) {
+        viewModel.selectDashboardCampaign(campaignId)
+    }
     view.keepScreenOn = stats.isRunning
     val exporter = remember { LogExporter(context) }
     var exportMessage by remember { mutableStateOf<String?>(null) }
+    val isActiveCampaign = runningCampaign?.id == campaignId
 
     Column(
         modifier = Modifier.fillMaxSize().padding(16.dp),
@@ -46,11 +58,16 @@ fun CampaignDashboard(
                 Icon(Icons.Default.ArrowBack, contentDescription = "Back")
             }
             Spacer(Modifier.width(4.dp))
-            Text("Dashboard", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+            Column {
+                Text(campaign?.name ?: "Dashboard", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+                campaign?.status?.let {
+                    Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
             Spacer(Modifier.weight(1f))
             if (stats.total > 0) {
                 FilledTonalButton(onClick = {
-                    val uri = exporter.exportToCsv(stats.campaignId)
+                    val uri = exporter.exportToCsv(campaignId)
                     if (uri != null) {
                         val shareIntent = Intent(Intent.ACTION_SEND).apply {
                             type = "text/csv"
@@ -113,16 +130,54 @@ fun CampaignDashboard(
             StatCard("Paused", stats.paused, Color(0xFF2196F3), Icons.Default.PauseCircle, Modifier.weight(1f))
         }
 
+        Text("Pipeline", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            StatCard("Replies", outcomeStats.totalResponses, Color(0xFF1565C0), Icons.Default.Forum, Modifier.weight(1f))
+            StatCard("Hot", outcomeStats.hotLeads, Color(0xFFD84315), Icons.Default.LocalFireDepartment, Modifier.weight(1f))
+            StatCard("Warm", outcomeStats.warmLeads, Color(0xFFEF6C00), Icons.Default.Bolt, Modifier.weight(1f))
+            StatCard("Deals", outcomeStats.dealCount, Color(0xFF2E7D32), Icons.Default.Handshake, Modifier.weight(1f))
+        }
+
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("Outcome Summary", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                SummaryRow("Cold leads", outcomeStats.coldLeads.toString())
+                SummaryRow("Pending follow-up", outcomeStats.unfollowedLeads.toString())
+                SummaryRow("Average lead score", String.format("%.1f", outcomeStats.averageLeadScore))
+                SummaryRow("Deal value", formatCurrency(outcomeStats.totalDealValue))
+            }
+        }
+
+        Text("Top Responses", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+        if (topResponses.isEmpty()) {
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Box(modifier = Modifier.fillMaxWidth().padding(20.dp), contentAlignment = Alignment.Center) {
+                    Text("No broker replies captured yet.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        } else {
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    topResponses.forEach { response ->
+                        ResponseEntry(response)
+                    }
+                }
+            }
+        }
+
         // Control buttons
         Card(modifier = Modifier.fillMaxWidth()) {
             Row(
                 modifier = Modifier.fillMaxWidth().padding(16.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                if (stats.isRunning) {
+                if (isActiveCampaign) {
                     if (stats.isPaused) {
                         Button(
-                            onClick = { viewModel.resumeCampaign() },
+                            onClick = { viewModel.resumeSelectedCampaign() },
                             modifier = Modifier.weight(1f)
                         ) {
                             Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
@@ -154,6 +209,16 @@ fun CampaignDashboard(
                         Spacer(Modifier.width(4.dp))
                         Text("Back")
                     }
+                    if (campaign?.status == CampaignStatus.PAUSED) {
+                        Button(
+                            onClick = { viewModel.resumeSelectedCampaign() },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(4.dp))
+                            Text("Resume")
+                        }
+                    }
                 }
             }
         }
@@ -174,6 +239,18 @@ fun CampaignDashboard(
 }
 
 @Composable
+private fun SummaryRow(label: String, value: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(value, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+    }
+}
+
+@Composable
 private fun StatCard(label: String, count: Int, color: Color, icon: androidx.compose.ui.graphics.vector.ImageVector, modifier: Modifier = Modifier) {
     Card(
         modifier = modifier,
@@ -187,6 +264,102 @@ private fun StatCard(label: String, count: Int, color: Color, icon: androidx.com
             Spacer(Modifier.height(4.dp))
             Text(count.toString(), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = color)
             Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+private fun formatCurrency(value: Double): String {
+    if (value <= 0.0) return "Rs 0"
+    return "Rs ${"%,.0f".format(value)}"
+}
+
+@Composable
+private fun ResponseEntry(response: CampaignResponse) {
+    val intentColor = when (response.intentLevel) {
+        "HOT" -> Color(0xFFD84315)
+        "WARM" -> Color(0xFFEF6C00)
+        else -> Color(0xFF546E7A)
+    }
+    var showDealForm by remember { mutableStateOf(false) }
+    var dealValueText by remember { mutableStateOf("") }
+    val viewModel: CampaignViewModel = hiltViewModel()
+
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.Top
+        ) {
+            Surface(
+                color = intentColor.copy(alpha = 0.14f),
+                shape = MaterialTheme.shapes.small
+            ) {
+                Text(
+                    response.intentLevel,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                    color = intentColor,
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    response.brokerName.ifBlank { response.brokerPhone },
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    response.responseText.ifBlank { "No response text captured" },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    "Score ${String.format("%.0f", response.hotLeadScore)}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (!response.followUpSent) {
+                OutlinedButton(onClick = { viewModel.markDashboardFollowUpSent(response.id) }) {
+                    Text("Mark Follow-up")
+                }
+            }
+            if (!response.dealClosed) {
+                Button(onClick = { showDealForm = !showDealForm }) {
+                    Text(if (showDealForm) "Cancel Deal" else "Close Deal")
+                }
+            }
+        }
+
+        if (showDealForm && !response.dealClosed) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                OutlinedTextField(
+                    value = dealValueText,
+                    onValueChange = { dealValueText = it.filter { ch -> ch.isDigit() || ch == '.' } },
+                    label = { Text("Deal value") },
+                    modifier = Modifier.weight(1f),
+                    singleLine = true
+                )
+                Button(
+                    onClick = {
+                        val dealValue = dealValueText.toDoubleOrNull()
+                        if (dealValue != null && dealValue > 0.0) {
+                            viewModel.markDashboardDealClosed(response, dealValue)
+                            showDealForm = false
+                            dealValueText = ""
+                        }
+                    }
+                ) {
+                    Text("Save")
+                }
+            }
         }
     }
 }

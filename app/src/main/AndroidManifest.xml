@@ -39,7 +39,7 @@
             </intent-filter>
         </activity>
 
-        <!-- Legacy activity for backward compatibility -->
+        <!-- Legacy activity retained only for internal compatibility during migration. -->
         <activity
             android:name=".MainActivity"
             android:exported="false"
@@ -48,7 +48,7 @@
         <service
             android:name=".service.WhatsAppAccessibilityService"
             android:exported="true"
-android:label="WaBro"
+            android:label="WaBro"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
             <intent-filter>
                 <action android:name="android.accessibilityservice.AccessibilityService" />

@@ -4,6 +4,7 @@ FROM joseluisq/static-web-server:2 AS builder
 ENV SERVER_PORT=8000
 EXPOSE 8000
 COPY landing/ /public/
+COPY web/ /public/app/
 
 # Stage 2: Production
 FROM joseluisq/static-web-server:2
@@ -12,6 +13,7 @@ ENV CACHE_CONTROL="public, max-age=3600, s-maxage=86400"
 EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=3s CMD wget -qO- http://localhost:$PORT/ || exit 1
 COPY landing/ /public/
+COPY web/ /public/app/
 COPY CNAME /public/CNAME 2>/dev/null || true
 COPY privacy.html /public/privacy.html 2>/dev/null || true
 COPY terms.html /public/terms.html 2>/dev/null || true

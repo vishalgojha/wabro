@@ -19,6 +19,9 @@ interface CampaignDao {
     @Query("SELECT * FROM campaigns WHERE id = :id")
     suspend fun getById(id: Long): Campaign?
 
+    @Query("SELECT * FROM campaigns WHERE id = :id")
+    fun getByIdFlow(id: Long): Flow<Campaign?>
+
     @Query("SELECT * FROM campaigns ORDER BY createdAt DESC")
     fun getAllFlow(): Flow<List<Campaign>>
 

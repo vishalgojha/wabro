@@ -1,7 +1,9 @@
 package com.chaoscraft.wablaster.db.daos
 
 import androidx.room.*
+import com.chaoscraft.wablaster.db.entities.Broker
 import com.chaoscraft.wablaster.db.entities.BrokerGroupCrossRef
+import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface BrokerGroupCrossRefDao {
@@ -27,7 +29,7 @@ interface BrokerGroupCrossRefDao {
         WHERE bgcr.groupId = :groupId
         ORDER BY b.name ASC
     """)
-    fun getBrokersInGroup(groupId: Long): androidx.room.Flowable<List<com.chaoscraft.wablaster.db.entities.Broker>>
+    fun getBrokersInGroup(groupId: Long): Flow<List<Broker>>
 
     @Query("SELECT groupId FROM broker_group_cross_ref WHERE brokerId = :brokerId")
     suspend fun getGroupIdsForBroker(brokerId: Long): List<Long>

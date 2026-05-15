@@ -1,68 +1,53 @@
 package com.chaoscraft.wablaster.ui.theme
 
-import android.app.Activity
-import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.material3.*
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Typography
+import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.graphics.Color
 
 private val DarkColorScheme = darkColorScheme(
-    primary = Purple40,
-    secondary = PurpleGrey30,
-    tertiary = Pink40,
-    background = DarkGray,
-    surface = DarkGray,
-    onPrimary = Color.White,
+    primary = Color(0xFF25D366),
+    secondary = Color(0xFF128C7E),
+    tertiary = Color(0xFF6DD3A8),
+    background = Color(0xFF121212),
+    surface = Color(0xFF1E1E1E),
+    onPrimary = Color.Black,
     onSecondary = Color.White,
-    onTertiary = Color.White,
-    onBackground = Color(0xFFE1E1E1),
-    onSurface = Color(0xFFE1E1E1),
-    surfaceVariant = DarkGray,
-    onSurfaceVariant = Color.LightGray
+    onTertiary = Color.Black,
+    onBackground = Color(0xFFEDEDED),
+    onSurface = Color(0xFFEDEDED)
 )
 
 private val LightColorScheme = lightColorScheme(
-    primary = Purple40,
-    secondary = PurpleGrey30,
-    tertiary = Pink40,
-    background = Color(0xFFFFFBFE),
-    surface = Color(0xFFFFFBFE),
+    primary = Color(0xFF128C7E),
+    secondary = Color(0xFF25D366),
+    tertiary = Color(0xFF0B6E4F),
+    background = Color(0xFFF7F9F8),
+    surface = Color.White,
     onPrimary = Color.White,
-    onSecondary = Color.White,
+    onSecondary = Color.Black,
     onTertiary = Color.White,
-    onBackground = Color(0xFF1C1B1F),
-    onSurface = Color(0xFF1C1B1F),
-    surfaceVariant = LightGray,
-    onSurfaceVariant = Color.DarkGray
+    onBackground = Color(0xFF101412),
+    onSurface = Color(0xFF101412)
 )
-
-private val DarkGray = Color(0xFF1C1B1F)
-private val LightGray = Color(0xFFF5F5F5)
 
 @Composable
 fun WaBroV2Theme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    dynamicColor: Boolean = true,
+    dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {
-    val colorScheme = when {
-        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            val context = LocalContext.current
-            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-        }
-        darkTheme -> DarkColorScheme
-        else -> LightColorScheme
-    }
-
+    val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
     MaterialTheme(
         colorScheme = colorScheme,
-        typography = Typography,
+        typography = Typography(),
         content = content
     )
 }
 
-// Keep backward compatibility
 @Composable
 fun WaBlasterTheme(content: @Composable () -> Unit) {
     WaBroV2Theme(content = content)
