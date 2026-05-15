@@ -327,6 +327,31 @@ textarea {
     resize: vertical;
 }
 
+.import-block {
+    flex: 1 1 100%;
+    display: grid;
+    gap: 10px;
+    padding-top: 6px;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.import-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.import-note {
+    color: var(--muted);
+    font-size: 0.84rem;
+}
+
+.import-status {
+    color: var(--muted);
+    font-size: 0.84rem;
+}
+
 .empty-state {
     min-height: 180px;
     display: grid;

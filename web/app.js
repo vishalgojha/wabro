@@ -31,6 +31,58 @@ function byId(items, id) {
   return items.find((item) => String(item.id) === String(id));
 }
 
+function normalizePhone(phone) {
+  return String(phone || "").replace(/[^\d+]/g, "").trim();
+}
+
+function brokerExists(phone) {
+  const normalized = normalizePhone(phone);
+  return state.brokers.some((broker) => normalizePhone(broker.phone) === normalized);
+}
+
+function addBrokerRecord({ name, phone, locality = "" }) {
+  const cleanName = String(name || "").trim();
+  const cleanPhone = normalizePhone(phone);
+  const cleanLocality = String(locality || "").trim();
+
+  if (!cleanName || !cleanPhone || brokerExists(cleanPhone)) {
+    return false;
+  }
+
+  state.brokers.push({
+    id: nextId(state.brokers),
+    name: cleanName,
+    phone: cleanPhone,
+    locality: cleanLocality
+  });
+  return true;
+}
+
+function parseBrokerBulkText(input) {
+  return String(input || "")
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const [name = "", phone = "", locality = ""] = line.split(",").map((part) => part.trim());
+      return { name, phone, locality };
+    })
+    .filter((broker) => broker.name && broker.phone);
+}
+
+function importBrokerList(rawText) {
+  const parsed = parseBrokerBulkText(rawText);
+  let imported = 0;
+
+  parsed.forEach((broker) => {
+    if (addBrokerRecord(broker)) {
+      imported += 1;
+    }
+  });
+
+  return { imported, total: parsed.length };
+}
+
 function formatCurrency(value) {
   return `Rs ${Number(value || 0).toLocaleString("en-IN")}`;
 }
@@ -322,8 +374,7 @@ document.querySelectorAll("[data-open-form]").forEach((button) => {
 document.getElementById("broker-form").addEventListener("submit", (event) => {
   event.preventDefault();
   const form = new FormData(event.currentTarget);
-  state.brokers.push({
-    id: nextId(state.brokers),
+  addBrokerRecord({
     name: form.get("name").trim(),
     phone: form.get("phone").trim(),
     locality: form.get("locality").trim()
@@ -331,6 +382,30 @@ document.getElementById("broker-form").addEventListener("submit", (event) => {
   event.currentTarget.reset();
   event.currentTarget.classList.add("hidden");
   rerender();
+});
+
+document.getElementById("broker-file").addEventListener("change", async (event) => {
+  const file = event.currentTarget.files?.[0];
+  if (!file) return;
+
+  const text = await file.text();
+  const input = document.getElementById("broker-bulk-input");
+  input.value = text;
+});
+
+document.getElementById("broker-import-btn").addEventListener("click", () => {
+  const input = document.getElementById("broker-bulk-input");
+  const status = document.getElementById("broker-import-status");
+  const { imported, total } = importBrokerList(input.value);
+  if (imported > 0) {
+    input.value = "";
+    const fileInput = document.getElementById("broker-file");
+    fileInput.value = "";
+    status.textContent = `${imported} of ${total} brokers imported. Duplicate or invalid rows were skipped.`;
+    rerender();
+    return;
+  }
+  status.textContent = total > 0 ? "No new brokers imported. Duplicate or invalid rows were skipped." : "No valid broker rows found to import.";
 });
 
 document.getElementById("listing-form").addEventListener("submit", (event) => {

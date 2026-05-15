@@ -102,6 +102,16 @@
                     <input type="text" name="phone" placeholder="Phone / WhatsApp" required />
                     <input type="text" name="locality" placeholder="Locality" />
                     <button type="submit" class="primary-btn">Save broker</button>
+                    <div class="import-block">
+                        <p class="eyebrow">Upload broker list</p>
+                        <input type="file" id="broker-file" accept=".csv,.txt" />
+                        <textarea id="broker-bulk-input" rows="5" placeholder="Paste one broker per line:&#10;Rohan Mehta,+919819000111,Andheri West&#10;Aarti Shah,+919819000222,Thane"></textarea>
+                        <div class="import-actions">
+                            <button type="button" class="secondary-btn" id="broker-import-btn">Import List</button>
+                            <span class="import-note">Format: `name, phone, locality`</span>
+                        </div>
+                        <span class="import-status" id="broker-import-status"></span>
+                    </div>
                 </form>
 
                 <div id="broker-list" class="entity-grid"></div>
