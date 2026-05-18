@@ -7,6 +7,7 @@ import com.chaoscraft.wablaster.db.daos.*
 import com.chaoscraft.wablaster.db.BrokerRepository
 import com.chaoscraft.wablaster.db.ListingRepository
 import com.chaoscraft.wablaster.engine.HumanTimingEngine
+import com.chaoscraft.wablaster.engine.InboundEventPoller
 import com.chaoscraft.wablaster.engine.ResponseClassifier
 import com.chaoscraft.wablaster.engine.ResponseTracker
 import com.chaoscraft.wablaster.engine.Skill
@@ -20,7 +21,6 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
-import kotlinx.coroutines.flow.MutableSharedFlow
 import okhttp3.OkHttpClient
 import java.util.concurrent.TimeUnit
 import javax.inject.Singleton
@@ -150,15 +150,14 @@ object AppModule {
 
     @Provides
     @Singleton
-    fun provideSkills(prefs: SharedPreferences, gemini: GeminiClient): List<Skill> {
-        val backendReplyEvents = MutableSharedFlow<String>(replay = 0)
+    fun provideSkills(prefs: SharedPreferences, gemini: GeminiClient, poller: InboundEventPoller): List<Skill> {
         return listOf(
             SpinSkill(),
             MergeSkill(),
             TranslateSkill(gemini),
             SmartCaptionSkill(gemini),
             AIRewriteSkill(gemini),
-            ReplyGuardSkill(backendReplyEvents),
+            ReplyGuardSkill(poller.replyEvents),
             WarmupSkill(prefs)
         )
     }

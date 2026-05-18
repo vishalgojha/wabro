@@ -17,7 +17,7 @@ error() { echo -e "${RED}[ERROR]${NC} $*"; exit 1; }
 # ──────────── Config ────────────
 REPO="git@github.com:vishalgojha/wabro.git"
 BRANCH="main"
-DOMAIN="wabro.propai.live"
+DOMAIN="app.propai.live"
 SERVER_PORT=8000
 
 # ──────────── Prerequisites ────────────

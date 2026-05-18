@@ -1,12 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">WaBro</string>
-    <string name="accessibility_description">WaBro uses accessibility to send WhatsApp messages through the app\'s own UI with human-like timing.</string>
     <string name="notification_broadcast_running">Broadcast campaign running...</string>
     <string name="notification_broadcast_paused">Broadcast campaign paused</string>
     <string name="notification_broadcast_complete">Broadcast campaign complete</string>
-    <string name="permission_accessibility_title">Enable Accessibility Service</string>
-    <string name="permission_accessibility_message">WaBro needs Accessibility Service access to send messages through WhatsApp automatically. Your messages and data are never stored or transmitted.</string>
     <string name="btn_start_broadcast">Start Broadcast</string>
     <string name="btn_pause">Pause</string>
     <string name="btn_resume">Resume</string>

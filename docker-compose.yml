@@ -25,9 +25,9 @@ services:
       - wabro-net
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.wabro-landing.rule=Host(`wabro.propai.live`)"
+      - "traefik.http.routers.wabro-landing.rule=Host(`app.propai.live`)"
       - "traefik.http.routers.wabro-landing.entrypoints=web"
-      - "traefik.http.routers.wabro-landing-secure.rule=Host(`wabro.propai.live`)"
+      - "traefik.http.routers.wabro-landing-secure.rule=Host(`app.propai.live`)"
       - "traefik.http.routers.wabro-landing-secure.entrypoints=websecure"
       - "traefik.http.routers.wabro-landing-secure.tls=true"
       - "traefik.http.routers.wabro-landing-secure.tls.certresolver=letsencrypt"
@@ -55,9 +55,30 @@ services:
   #   networks:
   #     - wabro-net
 
+  # ==========================================
+  # WaBro Backend — Baileys + Onboarding API
+  # ==========================================
+  wabro-backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: wabro-backend
+    restart: unless-stopped
+    ports:
+      - "3002:3002"
+    environment:
+      - PORT=3002
+      - TZ=Asia/Kolkata
+    volumes:
+      - wabro-auth:/app/auth
+      - wabro-data:/app/data
+    networks:
+      - wabro-net
+
 networks:
   wabro-net:
     driver: bridge
 
-# volumes:
-#   pgdata:
+volumes:
+  wabro-auth:
+  wabro-data:

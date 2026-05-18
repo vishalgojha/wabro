@@ -17,3 +17,13 @@ landing/WaBro.apk
 .android-sdk/
 .gradle-local/
 .jdk/
+
+# Baileys auth state and pre-built contact lists
+scripts/.auth/
+prebuilt-lists/
+scripts/node_modules/
+
+# Backend
+backend/auth/
+backend/data/
+backend/node_modules/

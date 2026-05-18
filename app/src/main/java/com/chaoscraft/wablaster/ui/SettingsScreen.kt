@@ -229,14 +229,6 @@ fun SettingsScreen(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                if (validator.isLegacyAutomationReady()) {
-                    Spacer(Modifier.height(8.dp))
-                    Text(
-                        "Legacy on-device automation is still detectable on this phone, but backend delivery is the default path.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
                 Spacer(Modifier.height(8.dp))
                 OutlinedButton(
                     onClick = { showLandingPage = true },

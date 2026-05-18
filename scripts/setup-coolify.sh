@@ -52,7 +52,7 @@ main() {
   echo "┌─────────────────────────────────────────────┐"
   echo "│  GitHub → Coolify Auto-Deploy Setup         │"
   echo "│  Repo: vishalgojha/wabro                     │"
-  echo "│  Domain: wabro.propai.live                   │"
+  echo "│  Domain: app.propai.live/wabro               │"
   echo "│  Coolify: http://116.202.9.89:8000           │"
   echo "└─────────────────────────────────────────────┘"
 

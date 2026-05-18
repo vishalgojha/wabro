@@ -42,6 +42,15 @@ Web control panel: `/app/` on the deployed domain
 5. Compose your campaign message
 6. Start broadcasting
 
+## Current Handoff Notes
+
+- The current Android source still ships the old accessibility-service execution path. This is confirmed in `app/src/main/AndroidManifest.xml` via `.service.WhatsAppAccessibilityService`, `android.permission.BIND_ACCESSIBILITY_SERVICE`, `android.accessibilityservice`, and `@xml/accessibility_service_config`.
+- Supporting runtime code still depends on that path, including `WhatsAppAccessibilityService.kt`, `AppValidator.kt`, `DashboardSyncManager.kt`, and `BroadcastForegroundService.kt`.
+- The intended migration away from accessibility has not been completed yet. Do not treat the current APK/build as Play-Store-safe or aligned with the non-accessibility target architecture.
+- Next session should decide and implement the replacement send model first: official WhatsApp API, user-confirmed send flow, deep-link/share-sheet assisted sending, or another explicit non-accessibility path.
+- After that decision, remove the accessibility service from manifest, permissions, resources, validation checks, and any broadcast execution path that still assumes background UI driving.
+- Backend/web already appears to support location-aware broadcast list primitives, but Android-side baked-in support for prebuilt area lists still needs explicit verification in the source/UI flow.
+
 ## Build from Source
 
 ```bash

@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="WaBro Onboarding — Connect WhatsApp, scan your broker network." />
+  <title>WaBro — Onboard</title>
+  <link rel="stylesheet" href="./styles.css" />
+  <style>
+    .onboard-shell {
+      max-width: 680px;
+      margin: 48px auto;
+      display: grid;
+      gap: 24px;
+    }
+
+    .onboard-card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      padding: 32px;
+      text-align: center;
+    }
+
+    .onboard-card h2 {
+      margin: 0 0 8px;
+      font-size: 1.6rem;
+    }
+
+    .email-step input {
+      width: 100%;
+      padding: 14px 16px;
+      border-radius: 14px;
+      border: 1px solid var(--line-strong);
+      background: var(--panel-soft);
+      color: var(--ink);
+      font-size: 1rem;
+      margin: 16px 0;
+    }
+
+    .email-step input:focus {
+      outline: none;
+      border-color: rgba(124, 242, 154, 0.45);
+      box-shadow: 0 0 0 4px rgba(124, 242, 154, 0.08);
+    }
+
+    .qr-display {
+      background: #fff;
+      border-radius: 16px;
+      padding: 24px;
+      display: inline-block;
+      margin: 16px auto;
+    }
+
+    .qr-display img {
+      display: block;
+      image-rendering: pixelated;
+    }
+
+    .status-message {
+      color: var(--muted);
+      margin: 12px 0 0;
+    }
+
+    .status-message.loading {
+      color: var(--brand);
+    }
+
+    .status-message.error {
+      color: var(--danger);
+    }
+
+    .step-indicator {
+      display: flex;
+      gap: 8px;
+      justify-content: center;
+      margin-bottom: 20px;
+    }
+
+    .step-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--line-strong);
+      transition: background 0.3s;
+    }
+
+    .step-dot.active { background: var(--brand); }
+    .step-dot.done { background: var(--brand-deep); }
+
+    .result-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 20px 0;
+    }
+
+    .result-stat {
+      background: var(--panel-soft);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 20px;
+    }
+
+    .result-stat strong {
+      display: block;
+      font-size: 2rem;
+      color: var(--brand);
+    }
+
+    .result-stat span {
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    .hidden { display: none !important; }
+
+    .retry-btn, .go-dashboard-btn {
+      margin-top: 16px;
+    }
+
+    @media (max-width: 600px) {
+      .onboard-shell { margin: 24px 16px; }
+      .onboard-card { padding: 20px; }
+      .result-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page-shell">
+    <header class="site-header">
+      <div class="container header-row">
+        <a class="brand-link" href="/wabro/app/">
+          <span class="brand-mark">WB</span>
+          <div>
+            <strong>WaBro</strong>
+            <span>Onboarding</span>
+          </div>
+        </a>
+      </div>
+    </header>
+
+    <main>
+      <div class="onboard-shell" id="app">
+        <!-- Step 0: Email -->
+        <div class="onboard-card email-step" id="step-email">
+          <h2>Connect Your WhatsApp</h2>
+          <p class="status-message">Enter your email to start building your broker network.</p>
+          <input type="email" id="email-input" placeholder="you@example.com" autocomplete="email" />
+          <button class="primary-btn" id="start-btn" style="width:100%">Generate QR Code</button>
+        </div>
+
+        <!-- Step 1: QR -->
+        <div class="onboard-card hidden" id="step-qr">
+          <div class="step-indicator">
+            <div class="step-dot active"></div>
+            <div class="step-dot"></div>
+            <div class="step-dot"></div>
+          </div>
+          <h2>Scan with WhatsApp</h2>
+          <p class="status-message">Open WhatsApp → Linked Devices → Link a Device</p>
+          <div class="qr-display" id="qr-container">
+            <div id="qr-placeholder" style="width:256px;height:256px;display:grid;place-items:center;color:#999;font-size:0.9rem">
+              Generating QR code...
+            </div>
+            <canvas id="qr-canvas" style="display:none"></canvas>
+          </div>
+          <p class="status-message loading" id="qr-status">Waiting for scan...</p>
+        </div>
+
+        <!-- Step 2: Scanning -->
+        <div class="onboard-card hidden" id="step-scanning">
+          <div class="step-indicator">
+            <div class="step-dot done"></div>
+            <div class="step-dot active"></div>
+            <div class="step-dot"></div>
+          </div>
+          <h2>Connected!</h2>
+          <p class="status-message loading">Scanning your groups to build broker contacts...</p>
+          <div style="margin:20px 0">
+            <div style="width:48px;height:48px;border:3px solid var(--line);border-top-color:var(--brand);border-radius:50%;animation:spin 1s linear infinite;margin:0 auto"></div>
+          </div>
+          <p class="status-message" id="scan-progress">Fetching group list...</p>
+        </div>
+
+        <!-- Step 3: Results -->
+        <div class="onboard-card hidden" id="step-results">
+          <div class="step-indicator">
+            <div class="step-dot done"></div>
+            <div class="step-dot done"></div>
+            <div class="step-dot done"></div>
+          </div>
+          <h2>Your Broker Network is Ready</h2>
+          <div class="result-grid" id="result-stats">
+            <div class="result-stat">
+              <strong id="result-count">0</strong>
+              <span>broker contacts</span>
+            </div>
+            <div class="result-stat">
+              <strong id="result-areas">0</strong>
+              <span>areas / zones</span>
+            </div>
+          </div>
+          <p class="status-message">Broadcast lists have been created from your WhatsApp groups.</p>
+          <button class="primary-btn go-dashboard-btn" id="go-dashboard-btn" style="width:100%">
+            Go to Broadcast Lists →
+          </button>
+        </div>
+
+        <!-- Error state -->
+        <div class="onboard-card hidden" id="step-error">
+          <h2>Something went wrong</h2>
+          <p class="status-message error" id="error-message"></p>
+          <button class="primary-btn retry-btn" id="retry-btn" style="width:100%">Try Again</button>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script type="module" src="./onboard.js"></script>
+</body>
+</html>

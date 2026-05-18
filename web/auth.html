@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Sign up or sign in to WaBro — WhatsApp Broadcast for Brokers" />
+  <title>WaBro — Sign In</title>
+  <link rel="stylesheet" href="./styles.css" />
+  <style>
+    .auth-shell {
+      max-width: 480px;
+      margin: 64px auto;
+      display: grid;
+      gap: 24px;
+    }
+
+    .auth-brand {
+      text-align: center;
+    }
+    .auth-brand .brand-mark {
+      margin: 0 auto 12px;
+    }
+    .auth-brand h1 {
+      font-size: 1.8rem;
+      margin: 0;
+    }
+    .auth-brand p {
+      color: var(--muted);
+      margin: 4px 0 0;
+    }
+
+    .auth-card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      padding: 32px;
+    }
+
+    .auth-tabs {
+      display: flex;
+      gap: 4px;
+      background: var(--panel-soft);
+      border-radius: 14px;
+      padding: 4px;
+      margin-bottom: 24px;
+    }
+    .auth-tab {
+      flex: 1;
+      padding: 10px;
+      text-align: center;
+      border-radius: 12px;
+      border: none;
+      background: transparent;
+      color: var(--muted);
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .auth-tab.active {
+      background: var(--brand);
+      color: #062112;
+    }
+
+    .auth-form {
+      display: grid;
+      gap: 14px;
+    }
+    .auth-form input {
+      width: 100%;
+      padding: 14px 16px;
+      border-radius: 14px;
+      border: 1px solid var(--line-strong);
+      background: var(--panel-soft);
+      color: var(--ink);
+      font-size: 1rem;
+    }
+    .auth-form input:focus {
+      outline: none;
+      border-color: rgba(124, 242, 154, 0.45);
+      box-shadow: 0 0 0 4px rgba(124, 242, 154, 0.08);
+    }
+
+    .auth-form button[type="submit"] {
+      width: 100%;
+      padding: 14px;
+      border-radius: 14px;
+      border: none;
+      background: linear-gradient(135deg, var(--brand), #57cc7d);
+      color: #062112;
+      font-weight: 800;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: transform 0.18s;
+    }
+    .auth-form button[type="submit"]:hover {
+      transform: translateY(-1px);
+    }
+    .auth-form button[type="submit"]:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .auth-error {
+      color: var(--danger);
+      font-size: 0.9rem;
+      min-height: 1.4em;
+      margin: 0;
+    }
+
+    .auth-separator {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      color: var(--muted);
+      font-size: 0.85rem;
+      margin: 8px 0;
+    }
+    .auth-separator::before,
+    .auth-separator::after {
+      content: "";
+      flex: 1;
+      height: 1px;
+      background: var(--line-strong);
+    }
+
+    .hidden { display: none !important; }
+
+    @media (max-width: 600px) {
+      .auth-shell { margin: 32px 16px; }
+      .auth-card { padding: 20px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page-shell">
+    <header class="site-header">
+      <div class="container header-row">
+        <a class="brand-link" href="/wabro/app/">
+          <span class="brand-mark">WB</span>
+          <div>
+            <strong>WaBro</strong>
+            <span>PropAI</span>
+          </div>
+        </a>
+      </div>
+    </header>
+
+    <main>
+      <div class="auth-shell" id="app">
+        <div class="auth-brand">
+          <div class="brand-mark" style="width:56px;height:56px;font-size:1.4rem">WB</div>
+          <h1>WaBro Broadcasts</h1>
+          <p>Powered by PropAI — one account for both platforms</p>
+        </div>
+
+        <div class="auth-card">
+          <div class="auth-tabs">
+            <button class="auth-tab active" data-tab="signin" id="tab-signin">Sign In</button>
+            <button class="auth-tab" data-tab="signup" id="tab-signup">Create Account</button>
+          </div>
+
+          <form class="auth-form" id="auth-form">
+            <p class="auth-error" id="auth-error"></p>
+
+            <input type="text" name="name" id="field-name" placeholder="Full Name" class="hidden" autocomplete="name" />
+
+            <input type="email" name="email" id="field-email" placeholder="Email address" required autocomplete="email" />
+
+            <input type="password" name="password" id="field-password" placeholder="Password (min 6 chars)" required minlength="6" autocomplete="new-password" />
+
+            <input type="password" name="confirm" id="field-confirm" placeholder="Confirm password" class="hidden" autocomplete="new-password" />
+
+            <button type="submit" id="auth-submit">Sign In</button>
+          </form>
+
+          <p style="color:var(--muted);font-size:0.85rem;text-align:center;margin:16px 0 0">
+            Same account works on <a href="https://app.propai.live" style="color:var(--brand)">PropAI</a>
+          </p>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script type="module" src="./auth.js"></script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+{
+  "name": "wabro-backend",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@whiskeysockets/baileys": "^6.7.0",
+    "better-sqlite3": "^11.0.0",
+    "cors": "^2.8.5",
+    "express": "^4.21.0",
+    "pino": "^9.0.0",
+    "qrcode": "^1.5.4"
+  }
+}

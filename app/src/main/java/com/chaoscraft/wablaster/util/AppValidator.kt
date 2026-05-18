@@ -3,7 +3,6 @@ package com.chaoscraft.wablaster.util
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
-import android.provider.Settings
 
 data class ValidationResult(
     val isValid: Boolean,
@@ -57,32 +56,10 @@ class AppValidator(private val context: Context) {
         }
     }
 
-    fun isAccessibilityServiceEnabled(): Boolean {
-        val service = "${context.packageName}/com.chaoscraft.wablaster.service.WhatsAppAccessibilityService"
-        return try {
-            val enabledServices = Settings.Secure.getString(
-                context.contentResolver,
-                Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
-            )
-            enabledServices?.contains(service) == true
-        } catch (_: Exception) {
-            false
-        }
-    }
-
     fun isBatteryOptimizationIgnored(): Boolean {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return true
         val powerManager = context.getSystemService(Context.POWER_SERVICE) as? android.os.PowerManager
         return powerManager?.isIgnoringBatteryOptimizations(context.packageName) ?: false
-    }
-
-    fun canDrawOverlays(): Boolean {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return true
-        return Settings.canDrawOverlays(context)
-    }
-
-    fun isLegacyAutomationReady(): Boolean {
-        return isWhatsAppInstalled() && isAccessibilityServiceEnabled()
     }
 
     fun isNotificationPermissionGranted(): Boolean {

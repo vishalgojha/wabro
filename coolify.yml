@@ -5,7 +5,7 @@
 APP_NAME=wabro-landing
 APP_TYPE=docker
 APP_PORT=8000
-APP_DOMAIN=wabro.propai.live
+APP_DOMAIN=app.propai.live
 
 # Server Configuration
 SERVER_PROVIDER=hetzner
@@ -29,7 +29,7 @@ SSL_PROVIDER=letsencrypt
 SSL_EMAIL=vishal@chaoscraftlabs.com
 
 # Domain Configuration
-PRIMARY_DOMAIN=wabro.propai.live
+PRIMARY_DOMAIN=app.propai.live
 ALSO_HOST_WWW=true
 
 # Health Check
