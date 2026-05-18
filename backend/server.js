@@ -81,6 +81,16 @@ app.get("/api/wabro/auth/me", async (req, res) => {
   }
 });
 
+app.get("/api/wabro/app-version", (req, res) => {
+  res.json({
+    versionCode: 2,
+    versionName: "1.1.0",
+    apkUrl: `${req.protocol}://${req.get("host")}/wabro/app/wabro-latest.apk`,
+    releaseNotes: "7-day free trial added\n- New sign-up/login screen\n- In-app update checker\n- Bug fixes",
+    forceUpdate: false
+  });
+});
+
 app.use("/api/wabro/onboard", onboardRouter);
 
 app.get("/api/wabro/dashboard/stats", (req, res) => {

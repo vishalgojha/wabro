@@ -20,6 +20,7 @@ import kotlinx.coroutines.launch
 
 enum class AuthMode { SIGN_IN, SIGN_UP }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AuthScreen(
     authManager: AuthManager,

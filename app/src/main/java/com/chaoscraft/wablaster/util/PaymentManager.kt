@@ -50,6 +50,6 @@ class PaymentManager @Inject constructor(
     companion object {
         private const val KEY_UNLOCKED = "app_unlocked"
         private const val KEY_INSTALLED_AT = "installed_at"
-        private const val TRIAL_MS = 3 * 24 * 60 * 60 * 1000L
+        private const val TRIAL_MS = 7 * 24 * 60 * 60 * 1000L
     }
 }
