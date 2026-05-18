@@ -58,9 +58,9 @@ class AuthManager @Inject constructor(
         private const val PREF_EXPIRES_AT = "auth_expires_at"
         private val JSON_MEDIA_TYPE = "application/json".toMediaType()
 
-        private const val AUTH_API_URL = "https://app.propai.live/api/wabro/auth/password"
+        private const val AUTH_API_URL = "http://116.202.9.89:8000/api/wabro/auth/password"
 
-        fun apiBaseUrl() = "https://app.propai.live/api/wabro/"
+        fun apiBaseUrl() = "http://116.202.9.89:8000/api/wabro/"
     }
 
     fun getSession(): AuthSession? {
