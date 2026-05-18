@@ -18,7 +18,7 @@ WaBro has two surfaces:
 
 ## Download
 
-[Download Latest APK (v1.1.1)](https://github.com/vishalgojha/wabro/releases/latest/download/wabro-release.apk)
+[Download Latest APK (v1.1.2)](https://github.com/vishalgojha/wabro/releases/latest/download/wabro-release.apk)
 
 Auto-built on every push to `main`. The link above always points to the latest build.
 
