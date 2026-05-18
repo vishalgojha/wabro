@@ -38,7 +38,7 @@ jobs:
         env:
           CI: true
 
-      - name: Upload APK
+      - name: Upload APK (artifact)
         uses: actions/upload-artifact@v4
         with:
           name: app-debug
@@ -46,6 +46,33 @@ jobs:
           retention-days: 30
 
   release:
+    if: github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download APK
+        uses: actions/download-artifact@v4
+        with:
+          name: app-debug
+
+      - name: Rename for release
+        run: cp app-debug.apk wabro-release.apk
+
+      - name: Publish latest release
+        uses: ncipollo/release-action@v1
+        with:
+          tag: latest
+          name: WaBro Latest
+          body: "Auto-built from main branch. See commit history for details."
+          artifacts: wabro-release.apk
+          allowUpdates: true
+          removeArtifacts: true
+          makeLatest: true
+          replacesArtifacts: true
+
+  tag-release:
     if: startsWith(github.ref, 'refs/tags/v')
     needs: build
     runs-on: ubuntu-latest
@@ -66,4 +93,4 @@ jobs:
           name: WaBro ${{ github.ref_name }}
           body: "See commit history for details."
           files: wabro-release.apk
-          make_latest: true
+          make_latest: false

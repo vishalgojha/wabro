@@ -18,9 +18,9 @@ WaBro has two surfaces:
 
 ## Download
 
-Latest APK is built automatically on every push. Download from [GitHub Actions](https://github.com/vishalgojha/wabro/actions) → latest run → **Artifacts → app-debug**.
+[Download Latest APK (v1.1.1)](https://github.com/vishalgojha/wabro/releases/latest/download/wabro-release.apk)
 
-To install: unzip the downloaded artifact and install `app-debug.apk`.
+Auto-built on every push to `main`. The link above always points to the latest build.
 
 Landing page: [https://vishalgojha.github.io/wabro/](https://vishalgojha.github.io/wabro/)
 
