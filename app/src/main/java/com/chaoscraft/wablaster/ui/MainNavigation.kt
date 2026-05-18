@@ -78,9 +78,37 @@ fun MainNavigation(
     ) { padding ->
         NavHost(
             navController = navController,
-            startDestination = NavTab.Brokers.route,
+            startDestination = NavTab.Home.route,
             modifier = androidx.compose.ui.Modifier.fillMaxSize().padding(padding)
         ) {
+            composable(NavTab.Home.route) {
+                HomeScreen(
+                    onOpenCampaigns = {
+                        currentTab = tabs.indexOf(NavTab.Campaigns)
+                        navController.navigate(NavTab.Campaigns.route) {
+                            popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    },
+                    onOpenLists = {
+                        currentTab = tabs.indexOf(NavTab.Brokers)
+                        navController.navigate(NavTab.Brokers.route) {
+                            popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    },
+                    onOpenDashboard = {
+                        currentTab = tabs.indexOf(NavTab.Dashboard)
+                        navController.navigate(NavTab.Dashboard.route) {
+                            popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    }
+                )
+            }
             composable(NavTab.Brokers.route) {
                 BrokerListScreen(
                     viewModel = brokerViewModel,
