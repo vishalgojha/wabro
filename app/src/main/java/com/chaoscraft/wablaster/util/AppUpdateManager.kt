@@ -38,7 +38,7 @@ class AppUpdateManager @Inject constructor(
     private val gson: Gson
 ) {
     companion object {
-        private const val VERSION_URL = "https://app.propai.live/wabro/api/v1/app-version"
+        private const val VERSION_URL = "https://app.propai.live/api/wabro/app-version"
         private const val APK_DIR = "apk"
         private const val APK_FILE = "wabro-update.apk"
     }

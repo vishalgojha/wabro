@@ -13,9 +13,9 @@ const state = {
 function getApiBase() {
   const { hostname, protocol } = window.location;
   if (hostname === "localhost" || hostname === "127.0.0.1") {
-    return "http://localhost:3002/api";
+    return "http://localhost:3002/api/wabro";
   }
-  return `${window.location.origin}/api`;
+  return `${window.location.origin}/api/wabro`;
 }
 
 const apiBase = getApiBase();

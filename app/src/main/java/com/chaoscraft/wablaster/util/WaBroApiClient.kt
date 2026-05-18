@@ -222,6 +222,6 @@ class WaBroApiClient @Inject constructor(
     companion object {
         private val JSON_MEDIA_TYPE = "application/json".toMediaType()
         private const val PREF_API_BASE_URL = "wabro_api_base_url"
-        private const val DEFAULT_API_BASE_URL = "https://app.propai.live/wabro/api/v1/"
+        private const val DEFAULT_API_BASE_URL = "https://app.propai.live/api/wabro/"
     }
 }
