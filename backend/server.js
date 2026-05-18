@@ -3,6 +3,8 @@ import cors from "cors";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import onboardRouter from "./routes/onboard.js";
+import messagesRouter from "./routes/messages.js";
+import { initBot } from "./bot.js";
 import {
   getStats,
   createUser,
@@ -83,15 +85,18 @@ app.get("/api/wabro/auth/me", async (req, res) => {
 
 app.get("/api/wabro/app-version", (req, res) => {
   res.json({
-    versionCode: 3,
-    versionName: "1.1.1",
+    versionCode: 5,
+    versionName: "1.2.0",
     apkUrl: `${req.protocol}://${req.get("host")}/wabro/app/wabro-latest.apk`,
-    releaseNotes: "Home screen with marketing copy\n- Quick action cards\n- Revamped paywall with trial-first flow",
+    releaseNotes: "- Interactive Listing Cards (Buttons)\n- Blue Tick Tracking (Read Receipts)\n- WhatsApp Status Automation\n- Automated Brochure Bot\n- Stealth Mode Presence Management",
     forceUpdate: false
   });
 });
 
 app.use("/api/wabro/onboard", onboardRouter);
+app.use("/api/wabro/messages", messagesRouter);
+
+initBot();
 
 app.get("/api/wabro/dashboard/stats", (req, res) => {
   const { email } = req.query;

@@ -68,6 +68,7 @@ router.get("/status/:sessionId", (req, res) => {
     const onError = (msg) => sendEvent("error", { message: msg });
     const onLoggedOut = () => sendEvent("logged_out", {});
     const onReconnecting = () => sendEvent("reconnecting", {});
+    const onAck = (data) => sendEvent("message_ack", data);
 
     baileysConnector.on(`qr:${sessionId}`, onQR);
     baileysConnector.on(`connected:${sessionId}`, onConnected);
@@ -75,6 +76,7 @@ router.get("/status/:sessionId", (req, res) => {
     baileysConnector.on(`error:${sessionId}`, onError);
     baileysConnector.on(`logged_out:${sessionId}`, onLoggedOut);
     baileysConnector.on(`reconnecting:${sessionId}`, onReconnecting);
+    baileysConnector.on(`message.ack:${sessionId}`, onAck);
 
     req.on("close", () => {
       baileysConnector.removeListener(`qr:${sessionId}`, onQR);
@@ -83,6 +85,7 @@ router.get("/status/:sessionId", (req, res) => {
       baileysConnector.removeListener(`error:${sessionId}`, onError);
       baileysConnector.removeListener(`logged_out:${sessionId}`, onLoggedOut);
       baileysConnector.removeListener(`reconnecting:${sessionId}`, onReconnecting);
+      baileysConnector.removeListener(`message.ack:${sessionId}`, onAck);
       baileysConnector.cleanup(sessionId).catch(() => {});
     });
 

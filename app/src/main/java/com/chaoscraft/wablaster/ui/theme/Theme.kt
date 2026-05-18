@@ -8,27 +8,40 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
+val Brand = Color(0xFF10B981)
+val BgDeep = Color(0xFF050505)
+val BgSurface = Color(0xFF0A0A0A)
+val BgCard = Color(0xFF121212)
+val BorderDim = Color(0xFF222222)
+val BorderBright = Color(0xFF333333)
+val TextMain = Color(0xFFE5E5E5)
+val TextMuted = Color(0xFF666666)
+
 private val DarkColorScheme = darkColorScheme(
-    primary = Color(0xFF25D366),
-    secondary = Color(0xFF128C7E),
+    primary = Brand,
+    secondary = Color(0xFF10B981),
     tertiary = Color(0xFF6DD3A8),
-    background = Color(0xFF121212),
-    surface = Color(0xFF1E1E1E),
+    background = BgDeep,
+    surface = BgSurface,
+    surfaceVariant = BgCard,
     onPrimary = Color.Black,
-    onSecondary = Color.White,
+    onSecondary = Color.Black,
     onTertiary = Color.Black,
-    onBackground = Color(0xFFEDEDED),
-    onSurface = Color(0xFFEDEDED)
+    onBackground = TextMain,
+    onSurface = TextMain,
+    onSurfaceVariant = TextMuted,
+    outline = BorderDim,
+    outlineVariant = BorderBright
 )
 
 private val LightColorScheme = lightColorScheme(
-    primary = Color(0xFF128C7E),
-    secondary = Color(0xFF25D366),
-    tertiary = Color(0xFF0B6E4F),
+    primary = Brand,
+    secondary = Color(0xFF059669),
+    tertiary = Color(0xFF047857),
     background = Color(0xFFF7F9F8),
     surface = Color.White,
     onPrimary = Color.White,
-    onSecondary = Color.Black,
+    onSecondary = Color.White,
     onTertiary = Color.White,
     onBackground = Color(0xFF101412),
     onSurface = Color(0xFF101412)
