@@ -54,7 +54,14 @@ class V2MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         com.chaoscraft.wablaster.service.DashboardSyncManager.start(this)
 
-        if (paymentManager.installedAt == 0L) {
+        val payPrefs = PaymentManager.prefs(this)
+        val lastVersion = payPrefs.getInt(PaymentManager.KEY_LAST_VERSION, 0)
+        if (lastVersion < BuildConfig.VERSION_CODE) {
+            payPrefs.edit().putInt(PaymentManager.KEY_LAST_VERSION, BuildConfig.VERSION_CODE).apply()
+            if (paymentManager.installedAt > 0L && !paymentManager.isUnlocked) {
+                paymentManager.installedAt = System.currentTimeMillis()
+            }
+        } else if (paymentManager.installedAt == 0L) {
             paymentManager.installedAt = System.currentTimeMillis()
         }
 

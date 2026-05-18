@@ -50,6 +50,11 @@ class PaymentManager @Inject constructor(
     companion object {
         private const val KEY_UNLOCKED = "app_unlocked"
         private const val KEY_INSTALLED_AT = "installed_at"
+        const val KEY_LAST_VERSION = "last_version_code"
+        private const val PREFS_NAME = "payment_prefs"
         private const val TRIAL_MS = 7 * 24 * 60 * 60 * 1000L
+
+        fun prefs(context: Context): SharedPreferences =
+            context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     }
 }

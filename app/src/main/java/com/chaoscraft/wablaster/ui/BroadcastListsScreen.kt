@@ -108,11 +108,25 @@ fun BroadcastListsScreen(
                         style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                    Spacer(Modifier.height(4.dp))
                     Text(
-                        "Create a list to reuse across campaigns",
+                        "Import contacts or create a smart list to get started",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                     )
+                    Spacer(Modifier.height(24.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        FilledTonalButton(onClick = { showSmartListDialog = true }) {
+                            Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(4.dp))
+                            Text("Smart List")
+                        }
+                        Button(onClick = { showCreateDialog = true }) {
+                            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(4.dp))
+                            Text("New List")
+                        }
+                    }
                 }
             }
         } else {
@@ -506,7 +520,7 @@ private fun GroupImportUnavailableDialog(
         text = {
             Column {
                 Text(
-                    "Group import still depends on the old on-device accessibility flow and is disabled in backend delivery mode.",
+                    "Group import uses the WaBro backend for WhatsApp group sync. This feature will be available in a future update.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

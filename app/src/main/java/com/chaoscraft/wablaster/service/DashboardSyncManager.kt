@@ -135,7 +135,7 @@ class DashboardSyncManager : Service() {
     
     private suspend fun processCampaign(campaign: PendingCampaign) {
         // In a real implementation, this would trigger the actual campaign execution
-        // via the AccessibilityService or a separate worker
+        // via the campaign manager and broadcast foreground service
         Log.d(TAG, "Processing campaign: ${campaign.name}")
         
         // For now, just log that we received it

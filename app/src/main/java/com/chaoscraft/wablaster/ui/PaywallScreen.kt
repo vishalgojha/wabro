@@ -29,6 +29,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.chaoscraft.wablaster.util.AppValidator
 import com.chaoscraft.wablaster.util.PaymentConfig
+import com.chaoscraft.wablaster.util.PaymentManager
 import com.chaoscraft.wablaster.util.generateQrBitmap
 
 private const val SUPPORT_NUMBER = "9820056180"
@@ -37,7 +38,7 @@ private const val SUPPORT_NUMBER = "9820056180"
 fun PaywallScreen(onUnlocked: () -> Unit) {
     val context = LocalContext.current
     val validator = remember { AppValidator(context) }
-    val paymentManager = remember { com.chaoscraft.wablaster.util.PaymentManager(context) }
+    val paymentManager = remember { PaymentManager(context) }
     var showContactDialog by remember { mutableStateOf(false) }
     var batteryOptIgnored by remember { mutableStateOf(validator.isBatteryOptimizationIgnored()) }
     var notificationsGranted by remember { mutableStateOf(validator.isNotificationPermissionGranted()) }
@@ -77,35 +78,48 @@ fun PaywallScreen(onUnlocked: () -> Unit) {
             color = MaterialTheme.colorScheme.primary
         )
 
-        Text(
-            text = "License Required",
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.SemiBold
-        )
-
-        // Trial banner
+        // Trial active banner
         if (paymentManager.isTrialActive()) {
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(20.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Icon(Icons.Default.HourglassEmpty, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer, modifier = Modifier.size(28.dp))
-                    Spacer(Modifier.width(12.dp))
-                    Column {
-                        Text("Trial Active", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimaryContainer)
-                        Text(
-                            "${paymentManager.trialDaysRemaining()} day${if (paymentManager.trialDaysRemaining() > 1) "s" else ""} remaining",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                    Icon(
+                        Icons.Default.HourglassEmpty,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.size(40.dp)
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        "7-Day Free Trial Active",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                    Text(
+                        "${paymentManager.trialDaysRemaining()} day${if (paymentManager.trialDaysRemaining() > 1) "s" else ""} remaining",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                    )
+                    Spacer(Modifier.height(20.dp))
+                    Button(
+                        onClick = onUnlocked,
+                        modifier = Modifier.fillMaxWidth().height(52.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary
                         )
+                    ) {
+                        Text("Start Using WaBro", style = MaterialTheme.typography.titleMedium)
                     }
                 }
             }
         } else {
+            // Trial expired — show payment UI
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.error.copy(alpha = 0.15f))
@@ -122,133 +136,89 @@ fun PaywallScreen(onUnlocked: () -> Unit) {
                     }
                 }
             }
-        }
 
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceVariant
-            )
-        ) {
-            Column(
-                modifier = Modifier.padding(20.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Text(
-                    text = "Pay \u20B9${PaymentConfig.paymentAmount} to unlock",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    text = "One-time payment",
-                    style = MaterialTheme.typography.bodyMedium,
-                    textAlign = TextAlign.Center
-                )
-            }
-        }
-
-        qrBitmap?.let { bitmap ->
             Card(
-                modifier = Modifier.size(280.dp),
-                elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
             ) {
-                Image(
-                    bitmap = bitmap.asImageBitmap(),
-                    contentDescription = "UPI QR Code",
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(8.dp)
-                )
-            }
-        }
-
-        Card(modifier = Modifier.fillMaxWidth()) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Text("UPI ID", style = MaterialTheme.typography.labelMedium)
-                Text(
-                    text = PaymentConfig.upiId,
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
-                )
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    text = PaymentConfig.upiName,
-                    style = MaterialTheme.typography.bodyMedium
-                )
-            }
-        }
-
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text("PropAI", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimaryContainer)
-                    Text("List properties & get buyer leads", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f))
-                }
-                FilledTonalButton(onClick = {
-                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://app.propai.live")))
-                }) {
-                    Text("Open", color = MaterialTheme.colorScheme.onSecondaryContainer)
+                Column(
+                    modifier = Modifier.padding(20.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = "Pay \u20B9${PaymentConfig.paymentAmount} to unlock",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        text = "One-time payment — lifetime access",
+                        style = MaterialTheme.typography.bodyMedium,
+                        textAlign = TextAlign.Center
+                    )
                 }
             }
-        }
 
-        Text(
-            text = "1. Pay \u20B9${PaymentConfig.paymentAmount} to the UPI ID above\n2. Send screenshot to +91 9820056180 to activate",
-            style = MaterialTheme.typography.bodyMedium,
-            textAlign = TextAlign.Center,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+            qrBitmap?.let { bitmap ->
+                Card(
+                    modifier = Modifier.size(280.dp),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+                ) {
+                    Image(
+                        bitmap = bitmap.asImageBitmap(),
+                        contentDescription = "UPI QR Code",
+                        modifier = Modifier.fillMaxSize().padding(8.dp)
+                    )
+                }
+            }
 
-        Text(
-            text = "OR\n3. Use 3-day free trial (no payment needed)",
-            style = MaterialTheme.typography.bodyMedium,
-            textAlign = TextAlign.Center,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 8.dp)
-        )
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text("UPI ID", style = MaterialTheme.typography.labelMedium)
+                    Text(
+                        text = PaymentConfig.upiId,
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text(text = PaymentConfig.upiName, style = MaterialTheme.typography.bodyMedium)
+                }
+            }
 
-        Button(
-            onClick = { onUnlocked() },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(56.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = MaterialTheme.colorScheme.primary
-            )
-        ) {
             Text(
-                "I've Paid \u2014 Unlock",
-                style = MaterialTheme.typography.titleMedium
+                text = "1. Pay \u20B9${PaymentConfig.paymentAmount} to the UPI ID above\n2. Send screenshot to +91 9820056180 to activate",
+                style = MaterialTheme.typography.bodyMedium,
+                textAlign = TextAlign.Center,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+
+            Button(
+                onClick = { onUnlocked() },
+                modifier = Modifier.fillMaxWidth().height(56.dp)
+            ) {
+                Text("I've Paid \u2014 Unlock", style = MaterialTheme.typography.titleMedium)
+            }
+
+            TextButton(onClick = { showContactDialog = true }) {
+                Text("Need help? Contact us")
+            }
         }
 
-        Divider()
+        // Setup section
         Text(
             "Setup",
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold
         )
-        Text(
-            "One-tap setup for backend delivery:",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
 
         PermissionStatus(
             icon = Icons.Default.CloudDone,
             label = "Backend Delivery",
-            description = "Messages are sent through the WaBro backend instead of local accessibility automation."
+            description = "Messages are sent through the WaBro backend server for reliable delivery."
         )
 
         PermissionButton(
@@ -268,9 +238,7 @@ fun PaywallScreen(onUnlocked: () -> Unit) {
                 icon = Icons.Default.Notifications,
                 label = "Notifications",
                 granted = notificationsGranted,
-                onSetup = {
-                    notificationPermLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                }
+                onSetup = { notificationPermLauncher.launch(Manifest.permission.POST_NOTIFICATIONS) }
             )
         }
 
@@ -281,10 +249,6 @@ fun PaywallScreen(onUnlocked: () -> Unit) {
             Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
             Spacer(Modifier.width(4.dp))
             Text("Refresh Status")
-        }
-
-        TextButton(onClick = { showContactDialog = true }) {
-            Text("Need help? Contact us")
         }
 
         if (showContactDialog) {
@@ -302,7 +266,7 @@ fun PaywallScreen(onUnlocked: () -> Unit) {
                             color = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.clickable {
                                 val intent = Intent(Intent.ACTION_VIEW).apply {
-                                     data = Uri.parse("https://wa.me/91$SUPPORT_NUMBER?text=Hi%2C%20I%20paid%20for%20WaBro.%20Here%20is%20my%20payment%20screenshot.")
+                                    data = Uri.parse("https://wa.me/91$SUPPORT_NUMBER?text=Hi%2C%20I%20paid%20for%20WaBro.%20Here%20is%20my%20payment%20screenshot.")
                                 }
                                 context.startActivity(intent)
                             }
@@ -313,18 +277,10 @@ fun PaywallScreen(onUnlocked: () -> Unit) {
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                        Spacer(Modifier.height(12.dp))
-                        Text(
-                            text = "Or use 3-day free trial (no payment needed)",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
                     }
                 },
                 confirmButton = {
-                    TextButton(onClick = { showContactDialog = false }) {
-                        Text("OK")
-                    }
+                    TextButton(onClick = { showContactDialog = false }) { Text("OK") }
                 }
             )
         }
@@ -334,28 +290,16 @@ fun PaywallScreen(onUnlocked: () -> Unit) {
 }
 
 @Composable
-private fun PermissionStatus(
-    icon: ImageVector,
-    label: String,
-    description: String
-) {
+private fun PermissionStatus(icon: ImageVector, label: String, description: String) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(
-            icon,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary
-        )
+        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
         Spacer(Modifier.width(12.dp))
         Column {
             Text(label, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
-            Text(
-                description,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            Text(description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
@@ -365,17 +309,12 @@ private fun PermissionButton(icon: ImageVector, label: String, granted: Boolean,
     OutlinedButton(
         onClick = { if (!granted) onSetup() },
         modifier = Modifier.fillMaxWidth(),
-        colors = if (granted) ButtonDefaults.outlinedButtonColors(
-            contentColor = MaterialTheme.colorScheme.primary
-        ) else ButtonDefaults.outlinedButtonColors()
+        colors = if (granted) ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary)
+        else ButtonDefaults.outlinedButtonColors()
     ) {
         Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp))
         Spacer(Modifier.width(8.dp))
-        Text(
-            label,
-            modifier = Modifier.weight(1f),
-            color = if (granted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-        )
+        Text(label, modifier = Modifier.weight(1f))
         Icon(
             if (granted) Icons.Default.CheckCircle else Icons.Default.Cancel,
             contentDescription = null,
