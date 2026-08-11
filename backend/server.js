@@ -78,7 +78,6 @@ app.use((err, req, res, next) => {
 
 app.listen(PORT, () => {
   console.log(`WaBro backend running on http://localhost:${PORT}`);
-  console.log(`Auth page:    http://localhost:${PORT}/wabro/app/auth`);
-  console.log(`Onboard page: http://localhost:${PORT}/wabro/app/setup`);
   console.log(`Dashboard:    http://localhost:${PORT}/wabro/app/`);
+  console.log(`Onboard page: http://localhost:${PORT}/wabro/app/setup`);
 });
