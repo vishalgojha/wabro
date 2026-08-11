@@ -2,61 +2,57 @@
 
 Send bulk WhatsApp messages with human-like timing. Built for real estate brokers, agents, and sales teams.
 
-WaBro has two surfaces:
-- **Android app** — WhatsApp execution client
-- **Web control panel** — broker, listing, campaign management at `/app/`
+WaBro is a fully web-based product:
+- **Web control panel** — broker, listing, and campaign management
+- **QR onboarding** — link WhatsApp from the browser (no app installation)
+- **Backend delivery** — messages sent from the server via the linked WhatsApp account
 
 ## Features
 
 - **Bulk WhatsApp Broadcast** — Send personalised messages to thousands of contacts automatically
-- **Smart Lists** — Auto-filter phonebook contacts by keywords (broker, agent, ea, etc.)
-- **AI-Powered Skills** — Translate, rewrite, and smart-caption messages via Gemini AI (optional)
-- **Campaign Dashboard** — Track sent, pending, failed, replied in real time
-- **Broadcast Lists** — Save and reuse contact lists. Import from CSV or phonebook
+- **Smart Lists** — Auto-filter group contacts by keywords (broker, agent, ea, etc.) using area matching
+- **QR Link** — Connect your WhatsApp account by scanning a QR code from the browser
+- **Campaign Dashboard** — Track sent, pending, failed in real time
+- **Broadcast Lists** — Save and reuse contact lists. Import from CSV or paste broker rows
 - **Human-like Timing** — Random delays, burst guard, warmup to avoid bans
-- **Backend Delivery** — Messages sent through server — no accessibility service needed
+- **Backend Delivery** — Messages sent through the server using your linked WhatsApp account
 
-## Download
+## Pages
 
-[Download Latest APK (v1.2.0)](https://github.com/vishalgojha/wabro/releases/latest/download/wabro-release.apk)
-
-Auto-built on every push to `main`. The link above always points to the latest build.
-
-Landing page: [https://vishalgojha.github.io/wabro/](https://vishalgojha.github.io/wabro/)
-
-## Requirements
-
-- Android 8.0 (API 26) or higher
-- WhatsApp or WhatsApp Business installed
+- Landing: `/`
+- Web control panel: `/app/`
+- Sign in: `/app/auth`
+- WhatsApp QR onboarding: `/app/setup`
 
 ## Setup
 
-1. Install the APK
-2. Sign in with your PropAI account
-3. Start your 7-day free trial
-4. Configure sender account
-5. Import or build a contact list
-6. Compose and start a campaign
+1. Sign in with your PropAI account
+2. Start your 7-day free trial
+3. Scan the QR code to link your WhatsApp
+4. Import or build a contact list
+5. Compose and start a campaign
 
-## Build from Source
+## Local Development
 
 ```bash
-git clone git@github.com:vishalgojha/wabro.git
-cd wabro
-./gradlew assembleRelease
+cd backend
+npm install
+node server.js
 ```
 
-Requires JDK 17 and Android SDK 34.
+The backend serves the web app at `http://localhost:3002/wabro/app/`.
+
+## Deployment
+
+- Static web assets (`landing/`, `web/`) are served by the Docker `Dockerfile` (static-web-server).
+- The backend (`backend/`) runs as a separate container (see `docker-compose.yml`) with Baileys auth persisted in the `wabro-auth` volume.
+- Coolify/Hetzner deploy scripts live in `scripts/`.
 
 ## Tech Stack
 
-- **Language:** Kotlin
-- **UI:** Jetpack Compose (Material 3)
-- **DI:** Dagger Hilt
-- **Database:** Room
-- **Async:** Coroutines + Flow
-- **AI:** Gemini REST API (optional)
+- **Frontend:** Vanilla HTML/CSS/JS served as static files
 - **Backend:** Node.js + Express + Baileys + SQLite
+- **AI:** Gemini REST API (optional)
 
 ## License
 

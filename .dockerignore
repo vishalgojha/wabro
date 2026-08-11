@@ -1,16 +1,13 @@
 .git
-.gradle
-app
-build
-gradle
-gradlew
-gradlew.bat
-build.gradle.kts
-settings.gradle.kts
-gradle.properties
-local.properties
-keystore.properties
-release.keystore
 node_modules
 README.md
-*.apk
+
+# Backend runtime data
+backend/auth
+backend/data
+backend/node_modules
+
+# Scripts build data
+scripts/.auth
+scripts/node_modules
+prebuilt-lists

@@ -68,13 +68,13 @@ function setServiceState(nextState, message) {
   banner.dataset.state = nextState;
   if (nextState === "online") {
     title.textContent = "Dashboard service is live";
-    copy.textContent = message || "You can sign in and access WaBro campaigns, broker lists, and Android device status.";
+    copy.textContent = message || "You can sign in and access WaBro campaigns, broker lists, and WhatsApp connection status.";
     return;
   }
 
   if (nextState === "degraded") {
     title.textContent = "Dashboard service is temporarily unavailable";
-    copy.textContent = message || "The WaBro product page and APK download still work, but dashboard sign-in is blocked until the backend recovers.";
+    copy.textContent = message || "The WaBro product pages still work, but dashboard sign-in is blocked until the backend recovers.";
     return;
   }
 
@@ -183,7 +183,7 @@ async function checkServiceHealth() {
     setServiceState("online");
     return true;
   } catch {
-    setServiceState("degraded", "The dashboard backend is not reachable right now. You can still download the APK and review setup steps.");
+    setServiceState("degraded", "The dashboard backend is not reachable right now. You can still review the product pages and setup steps.");
     return false;
   }
 }
@@ -221,8 +221,8 @@ function renderStats() {
     total_sent: 0,
     total_failed: 0,
     total_skipped: 0,
-    active_devices: 0,
-    total_devices: 0
+    total_lists: 0,
+    total_contacts: 0
   };
 
   const cards = [
@@ -230,7 +230,7 @@ function renderStats() {
     ["Sent", stats.total_sent, "Messages marked sent"],
     ["Failed", stats.total_failed, "Failed delivery attempts"],
     ["Skipped", stats.total_skipped, "Contacts skipped in sync logs"],
-    ["Active Devices", stats.active_devices, "Polled in the last 5 minutes"],
+    ["Contacts", stats.total_contacts, "Contacts in broadcast lists"],
     ["Broker Lists", state.contactLists.length, "Saved broadcast lists"]
   ];
 
@@ -246,11 +246,11 @@ function renderStats() {
 
 function renderOverviewLists() {
   const campaignRoot = document.getElementById("recent-campaigns");
-  const deviceRoot = document.getElementById("device-health");
-  if (!campaignRoot || !deviceRoot) return;
+  const waRoot = document.getElementById("wa-connection");
+  if (!campaignRoot || !waRoot) return;
 
   campaignRoot.innerHTML = "";
-  deviceRoot.innerHTML = "";
+  waRoot.innerHTML = "";
 
   if (!state.campaigns.length) {
     campaignRoot.appendChild(emptyState("No campaigns yet", "Create a campaign from one of your saved broker lists."));
@@ -266,17 +266,12 @@ function renderOverviewLists() {
     });
   }
 
-  const stats = state.stats;
-  if (!stats?.total_devices) {
-    deviceRoot.appendChild(emptyState("No devices registered", "Devices will appear once the Android client registers with the backend."));
-  } else {
-    deviceRoot.appendChild(entityCard({
-      title: `${stats.active_devices} active of ${stats.total_devices}`,
-      meta: "Live device count",
-      body: "Detailed per-device metadata is not exposed by the current dashboard endpoint.",
-      tag: "Android"
-    }));
-  }
+  waRoot.appendChild(entityCard({
+    title: "WhatsApp link",
+    meta: "Status",
+    body: "Connect your WhatsApp from the setup page to enable campaign delivery.",
+    tag: "Web"
+  }));
 }
 
 function renderBrokerLists() {
@@ -332,23 +327,20 @@ function renderCampaigns() {
   });
 }
 
-function renderDevices() {
-  const root = document.getElementById("device-list");
+function renderConnection() {
+  const root = document.getElementById("connection-status");
   if (!root) return;
   root.innerHTML = "";
 
-  const stats = state.stats;
-  if (!stats?.total_devices) {
-    root.appendChild(emptyState("No devices registered", "Open the WaBro Android client and connect it to this backend account."));
-    return;
-  }
+  root.appendChild(emptyState("WhatsApp not linked", "Scan a QR code from the setup page to link your WhatsApp and start sending."));
 
-  root.appendChild(entityCard({
-    title: `${stats.total_devices} registered devices`,
-    meta: `${stats.active_devices} active recently`,
-    body: "This backend currently exposes device counts through dashboard stats, not full device cards.",
-    tag: "Device"
-  }));
+  const card = entityCard({
+    title: "Link your WhatsApp",
+    meta: "One-time QR scan",
+    body: "Open the setup page, scan the QR code with WhatsApp, and your account becomes the delivery channel.",
+    tag: "Web"
+  });
+  root.appendChild(card);
 }
 
 function rerender() {
@@ -357,7 +349,7 @@ function rerender() {
   renderBrokerLists();
   renderCampaignOptions();
   renderCampaigns();
-  renderDevices();
+  renderConnection();
   updateSessionCta();
 }
 

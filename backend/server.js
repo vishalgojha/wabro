@@ -83,16 +83,6 @@ app.get("/api/wabro/auth/me", async (req, res) => {
   }
 });
 
-app.get("/api/wabro/app-version", (req, res) => {
-  res.json({
-    versionCode: 5,
-    versionName: "1.2.0",
-    apkUrl: `${req.protocol}://${req.get("host")}/wabro/app/wabro-latest.apk`,
-    releaseNotes: "- Interactive Listing Cards (Buttons)\n- Blue Tick Tracking (Read Receipts)\n- WhatsApp Status Automation\n- Automated Brochure Bot\n- Stealth Mode Presence Management",
-    forceUpdate: false
-  });
-});
-
 app.use("/api/wabro/onboard", onboardRouter);
 app.use("/api/wabro/messages", messagesRouter);
 
