@@ -21,16 +21,16 @@ const WEB_DIR = join(__dirname, "..", "web");
 const app = express();
 const PORT = process.env.PORT || 3002;
 
+// No authentication — open access. All users share a single default workspace.
+const DEFAULT_EMAIL = "guest@wabro.local";
+
 app.use(cors());
 app.use(express.json());
 
 app.use("/wabro/app", express.static(WEB_DIR));
 
-app.get("/wabro/app/auth", (req, res) => {
-  res.sendFile(join(WEB_DIR, "auth.html"));
-});
-app.get("/wabro/app/auth.html", (req, res) => {
-  res.redirect("/wabro/app/auth");
+app.get(["/wabro/app/auth", "/wabro/app/auth.html"], (req, res) => {
+  res.redirect("/wabro/app/");
 });
 
 app.get("/wabro/app/setup", (req, res) => {
@@ -40,57 +40,13 @@ app.get("/wabro/app/setup.html", (req, res) => {
   res.redirect("/wabro/app/setup");
 });
 
-// proxy auth to shared PropAI backend
-const PROP_AUTH_URL = "https://api.propai.live/api/auth/password";
-app.post("/api/wabro/auth/password", express.json(), async (req, res) => {
-  try {
-    const resp = await fetch(PROP_AUTH_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(req.body),
-    });
-    const data = await resp.json();
-    res.status(resp.status).json(data);
-  } catch (err) {
-    res.status(502).json({ error: "Auth backend unreachable", message: err.message });
-  }
-});
-
-app.post("/api/wabro/auth/refresh", express.json(), async (req, res) => {
-  try {
-    const resp = await fetch("https://api.propai.live/api/auth/refresh", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(req.body),
-    });
-    const data = await resp.json();
-    res.status(resp.status).json(data);
-  } catch (err) {
-    res.status(502).json({ error: "Auth backend unreachable", message: err.message });
-  }
-});
-
-app.get("/api/wabro/auth/me", async (req, res) => {
-  try {
-    const authHeader = req.headers.authorization;
-    const resp = await fetch("https://api.propai.live/api/auth/me", {
-      headers: authHeader ? { Authorization: authHeader } : {},
-    });
-    const data = await resp.json();
-    res.status(resp.status).json(data);
-  } catch (err) {
-    res.status(502).json({ error: "Auth backend unreachable", message: err.message });
-  }
-});
-
 app.use("/api/wabro/onboard", onboardRouter);
 app.use("/api/wabro/messages", messagesRouter);
 
 initBot();
 
 app.get("/api/wabro/dashboard/stats", (req, res) => {
-  const { email } = req.query;
-  if (!email) return res.json({ stats: { total_lists: 0, total_contacts: 0, total_areas: 0 } });
+  const email = req.query.email || DEFAULT_EMAIL;
   const user = createUser(email);
   if (!user) return res.json({ stats: { total_lists: 0, total_contacts: 0, total_areas: 0 } });
   const ws = getOrCreateWorkspace(user.id);
@@ -103,8 +59,7 @@ app.get("/api/wabro/campaigns", (req, res) => {
 });
 
 app.get("/api/wabro/contacts", (req, res) => {
-  const { email } = req.query;
-  if (!email) return res.json({ lists: [] });
+  const email = req.query.email || DEFAULT_EMAIL;
   const user = createUser(email);
   if (!user) return res.json({ lists: [] });
   const ws = getOrCreateWorkspace(user.id);

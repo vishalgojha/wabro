@@ -17,3 +17,13 @@ Expires = "0"
 source = "/dashboard.html"
 destination = "/app/"
 kind = 302
+
+[[advanced.redirects]]
+source = "/app/auth"
+destination = "/app/"
+kind = 302
+
+[[advanced.redirects]]
+source = "/app/auth.html"
+destination = "/app/"
+kind = 302

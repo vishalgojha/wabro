@@ -27,7 +27,6 @@
                     <a class="ghost-btn" href="#pricing">Pricing</a>
                     <a class="ghost-btn" href="https://app.propai.live">PropAI</a>
                     <a class="primary-btn" href="/wabro/app/setup">Connect WhatsApp</a>
-                    <button class="ghost-btn hidden" id="logout-btn" type="button">Logout</button>
                 </nav>
             </div>
         </header>
@@ -61,20 +60,11 @@
 
                         <div class="auth-card" id="auth-card">
                             <p class="eyebrow">WaBro Dashboard</p>
-                            <h2>Sign in with your PropAI account</h2>
+                            <h2>Open the campaign dashboard</h2>
                             <p class="auth-copy">
-                                Use your existing account to load WaBro campaigns, broker lists, and WhatsApp connection status.
+                                No account needed. Anyone with access can manage broker lists, campaigns, and WhatsApp connection status.
                             </p>
-                            <form id="login-form" class="auth-form">
-                                <input type="email" name="email" placeholder="Email" required />
-                                <input type="password" name="password" placeholder="Password" required />
-                                <button type="submit" class="primary-btn" id="login-submit-btn">Sign In</button>
-                                <p class="auth-error" id="login-error"></p>
-                            </form>
-                            <div class="auth-success hidden" id="session-cta">
-                                <p>Signed in as <strong id="session-email"></strong></p>
-                                <button class="primary-btn" id="open-workspace-btn" type="button">Open Workspace</button>
-                            </div>
+                            <button class="primary-btn" id="open-workspace-btn" type="button">Open Workspace</button>
                         </div>
                     </aside>
                 </div>
@@ -126,8 +116,8 @@
                         </article>
                         <article class="step-card">
                             <span class="step-number">2</span>
-                            <h3>Sign in on web</h3>
-                            <p>Use your PropAI account to access the dashboard, manage broker lists, and create campaigns.</p>
+                            <h3>Manage from the web</h3>
+                            <p>Use the dashboard directly — no sign-in needed. Manage broker lists and create campaigns.</p>
                         </article>
                         <article class="step-card">
                             <span class="step-number">3</span>
@@ -169,7 +159,7 @@
                             <p class="eyebrow">WaBro Workspace</p>
                             <h2>Campaign dashboard</h2>
                             <p class="workspace-copy">
-                                Signed in as <span id="user-email"></span>. Manage broadcast campaigns, broker lists, and your linked WhatsApp connection.
+                                Manage broadcast campaigns, broker lists, and your linked WhatsApp connection.
                             </p>
                         </div>
                         <div class="workspace-actions">

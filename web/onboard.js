@@ -8,6 +8,7 @@ const API_BASE = (() => {
 
 let sessionId = null;
 let eventSource = null;
+let starting = false;
 
 const $ = (id) => document.getElementById(id);
 
@@ -86,7 +87,6 @@ async function pollResults(sid) {
         $("result-count").textContent = data.contact_count;
         $("result-areas").textContent = data.area_count;
         showStep("step-results");
-        localStorage.setItem("wabro-onboard-email", $("email-input").value.trim());
         return;
       }
     } catch {}
@@ -100,22 +100,18 @@ async function pollResults(sid) {
   poll();
 }
 
-$("start-btn").addEventListener("click", async () => {
-  const email = $("email-input").value.trim();
-  if (!email || !email.includes("@")) {
-    showError("Please enter a valid email address.");
-    return;
-  }
+async function startSession() {
+  if (starting) return;
+  starting = true;
 
-  $("start-btn").disabled = true;
-  $("start-btn").textContent = "Starting...";
+  $("qr-status").textContent = "Starting session...";
   showStep("step-qr");
 
   try {
     const resp = await fetch(`${API_BASE}/start`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email }),
+      body: JSON.stringify({}),
     });
 
     if (!resp.ok) {
@@ -129,30 +125,23 @@ $("start-btn").addEventListener("click", async () => {
     startSSE(sessionId);
   } catch (err) {
     showError(err.message || "Network error");
+  } finally {
+    starting = false;
   }
-});
-
-$("email-input").addEventListener("keydown", (e) => {
-  if (e.key === "Enter") $("start-btn").click();
-});
+}
 
 $("retry-btn").addEventListener("click", () => {
   if (eventSource) eventSource.close();
+  eventSource = null;
   sessionId = null;
-  $("start-btn").disabled = false;
-  $("start-btn").textContent = "Generate QR Code";
-  $("qr-status").textContent = "Waiting for scan...";
   $("qr-canvas").style.display = "none";
   $("qr-placeholder").style.display = "grid";
-  showStep("step-email");
+  $("qr-status").textContent = "Waiting for scan...";
+  startSession();
 });
 
 $("go-dashboard-btn").addEventListener("click", () => {
-  window.location.href = "/wabro/app/?onboarded=1";
+  window.location.href = "/wabro/app/";
 });
 
-// Pre-fill email if returning
-const savedEmail = localStorage.getItem("wabro-onboard-email");
-if (savedEmail) {
-  $("email-input").value = savedEmail;
-}
+startSession();

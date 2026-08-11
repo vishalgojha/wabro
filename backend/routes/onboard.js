@@ -16,11 +16,12 @@ const router = Router();
 
 const pendingSessions = new Map(); // sessionId -> { userEmail, resolve, timeout }
 
+const DEFAULT_EMAIL = "guest@wabro.local";
+
 // POST /api/wabro/onboard/start
 router.post("/start", async (req, res) => {
   try {
-    const { email } = req.body;
-    if (!email) return res.status(400).json({ error: "email is required" });
+    const email = req.body.email || DEFAULT_EMAIL;
 
     const sessionId = crypto.randomUUID();
     pendingSessions.set(sessionId, { email, createdAt: Date.now() });

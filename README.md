@@ -21,16 +21,16 @@ WaBro is a fully web-based product:
 
 - Landing: `/`
 - Web control panel: `/app/`
-- Sign in: `/app/auth`
 - WhatsApp QR onboarding: `/app/setup`
 
 ## Setup
 
-1. Sign in with your PropAI account
-2. Start your 7-day free trial
-3. Scan the QR code to link your WhatsApp
-4. Import or build a contact list
-5. Compose and start a campaign
+1. Open the web control panel
+2. Scan the QR code to link your WhatsApp
+3. Import or build a contact list
+4. Compose and start a campaign
+
+No sign-in is required. WaBro is open access — anyone with access to the dashboard can use it.
 
 ## Local Development
 

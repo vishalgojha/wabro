@@ -1,8 +1,4 @@
-const sessionStorageKey = "wabro-propai-session";
-
 const state = {
-  session: null,
-  user: null,
   stats: null,
   campaigns: [],
   contactLists: [],
@@ -20,42 +16,6 @@ function getApiBase() {
 
 const apiBase = getApiBase();
 
-function consumeAuthQueryParams() {
-  const url = new URL(window.location.href);
-  const email = url.searchParams.get("email");
-  const hasSensitiveParams = ["password", "token", "refresh_token", "access_token"].some((key) => url.searchParams.has(key));
-  const hasEmailParam = url.searchParams.has("email");
-
-  if (hasEmailParam || hasSensitiveParams) {
-    url.searchParams.delete("password");
-    url.searchParams.delete("token");
-    url.searchParams.delete("refresh_token");
-    url.searchParams.delete("access_token");
-    url.searchParams.delete("email");
-    const nextUrl = `${url.pathname}${url.search}${url.hash}`;
-    window.history.replaceState({}, document.title, nextUrl || window.location.pathname);
-  }
-
-  return email ? String(email).trim() : "";
-}
-
-function readStoredSession() {
-  try {
-    const raw = localStorage.getItem(sessionStorageKey);
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
-}
-
-function saveStoredSession(session) {
-  localStorage.setItem(sessionStorageKey, JSON.stringify(session));
-}
-
-function clearStoredSession() {
-  localStorage.removeItem(sessionStorageKey);
-}
-
 function setServiceState(nextState, message) {
   state.serviceState = nextState;
   const banner = document.getElementById("service-banner");
@@ -68,13 +28,13 @@ function setServiceState(nextState, message) {
   banner.dataset.state = nextState;
   if (nextState === "online") {
     title.textContent = "Dashboard service is live";
-    copy.textContent = message || "You can sign in and access WaBro campaigns, broker lists, and WhatsApp connection status.";
+    copy.textContent = message || "You can access WaBro campaigns, broker lists, and WhatsApp connection status.";
     return;
   }
 
   if (nextState === "degraded") {
     title.textContent = "Dashboard service is temporarily unavailable";
-    copy.textContent = message || "The WaBro product pages still work, but dashboard sign-in is blocked until the backend recovers.";
+    copy.textContent = message || "The WaBro product pages still work, but the dashboard is blocked until the backend recovers.";
     return;
   }
 
@@ -82,67 +42,9 @@ function setServiceState(nextState, message) {
   copy.textContent = message || "Verifying whether the WaBro dashboard backend is available.";
 }
 
-function setLoginBusy(isBusy) {
-  const submitButton = document.getElementById("login-submit-btn");
-  if (!submitButton) return;
-  submitButton.disabled = isBusy;
-  submitButton.textContent = isBusy ? "Signing In..." : "Sign In";
-}
-
-function updateSessionCta() {
-  const sessionCta = document.getElementById("session-cta");
-  const sessionEmail = document.getElementById("session-email");
-  const logoutButton = document.getElementById("logout-btn");
-  const loginForm = document.getElementById("login-form");
-  if (!sessionCta || !sessionEmail || !logoutButton || !loginForm) {
-    return;
-  }
-
-  if (state.session?.token) {
-    sessionEmail.textContent = state.user?.email || state.session.email || "";
-    sessionCta.classList.remove("hidden");
-    loginForm.classList.add("hidden");
-    logoutButton.classList.remove("hidden");
-    return;
-  }
-
-  sessionCta.classList.add("hidden");
-  loginForm.classList.remove("hidden");
-  logoutButton.classList.add("hidden");
-}
-
-async function refreshSessionIfNeeded() {
-  const session = state.session;
-  if (!session?.refreshToken || !session?.expiresAt || Date.now() < session.expiresAt - 5 * 60_000) {
-    return;
-  }
-
-  const response = await fetch(`${apiBase}/auth/refresh`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ refreshToken: session.refreshToken })
-  });
-
-  if (!response.ok) {
-    throw new Error("Session expired");
-  }
-
-  const data = await response.json();
-  const nextSession = {
-    ...session,
-    token: data?.session?.access_token,
-    refreshToken: data?.session?.refresh_token || session.refreshToken,
-    expiresAt: data?.session?.expires_in ? Date.now() + Number(data.session.expires_in) * 1000 : session.expiresAt
-  };
-  state.session = nextSession;
-  saveStoredSession(nextSession);
-}
-
 async function apiFetch(path, options = {}) {
-  await refreshSessionIfNeeded();
   const headers = {
     "Content-Type": "application/json",
-    ...(state.session?.token ? { Authorization: `Bearer ${state.session.token}` } : {}),
     ...(options.headers || {})
   };
 
@@ -150,11 +52,6 @@ async function apiFetch(path, options = {}) {
     ...options,
     headers
   });
-
-  if (response.status === 401) {
-    logout();
-    throw new Error("Session expired");
-  }
 
   if (!response.ok) {
     const data = await response.json().catch(() => ({}));
@@ -166,22 +63,14 @@ async function apiFetch(path, options = {}) {
 
 async function checkServiceHealth() {
   try {
-    const response = await fetch(`${apiBase}/auth/me`, {
-      headers: state.session?.token ? { Authorization: `Bearer ${state.session.token}` } : {}
-    });
-
-    if (response.status === 401 || response.ok) {
+    const response = await fetch(`${apiBase}/dashboard/stats`);
+    if (response.ok) {
       setServiceState("online");
       return true;
     }
 
-    if (response.status >= 500) {
-      setServiceState("degraded");
-      return false;
-    }
-
-    setServiceState("online");
-    return true;
+    setServiceState("degraded");
+    return false;
   } catch {
     setServiceState("degraded", "The dashboard backend is not reachable right now. You can still review the product pages and setup steps.");
     return false;
@@ -350,56 +239,21 @@ function rerender() {
   renderCampaignOptions();
   renderCampaigns();
   renderConnection();
-  updateSessionCta();
 }
 
 async function loadDashboard() {
-  const [me, dashboard, campaigns, lists] = await Promise.all([
-    apiFetch("/auth/me"),
+  const [dashboard, campaigns, lists] = await Promise.all([
     apiFetch("/wabro/dashboard/stats"),
     apiFetch("/wabro/campaigns"),
     apiFetch("/wabro/contacts")
   ]);
 
-  state.user = me?.user || me?.profile || null;
   state.stats = dashboard?.stats || null;
   state.campaigns = Array.isArray(campaigns?.campaigns) ? campaigns.campaigns : [];
   state.contactLists = Array.isArray(lists?.lists) ? lists.lists : [];
 
-  document.getElementById("user-email").textContent = state.user?.email || state.session?.email || "";
-  document.getElementById("session-email").textContent = state.user?.email || state.session?.email || "";
   setServiceState("online");
   rerender();
-}
-
-async function login(email, password) {
-  const response = await fetch(`${apiBase}/auth/password`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ mode: "signin", email, password })
-  });
-
-  const data = await response.json().catch(() => null);
-  if (!response.ok || !data?.session?.access_token) {
-    if (response.status >= 500) {
-      setServiceState("degraded");
-      throw new Error("Login service is temporarily unavailable");
-    }
-    throw new Error(data?.error || data?.message || "Login failed");
-  }
-
-  state.session = {
-    email: data?.user?.email || email,
-    token: data.session.access_token,
-    refreshToken: data.session.refresh_token,
-    expiresAt: data.session.expires_at
-      ? data.session.expires_at * 1000
-      : data.session.expires_in
-        ? Date.now() + Number(data.session.expires_in) * 1000
-        : undefined
-  };
-  saveStoredSession(state.session);
-  updateSessionCta();
 }
 
 function showWorkspace() {
@@ -409,18 +263,6 @@ function showWorkspace() {
 
 function hideWorkspace() {
   document.getElementById("workspace-shell").classList.add("hidden");
-}
-
-function logout() {
-  state.session = null;
-  state.user = null;
-  state.stats = null;
-  state.campaigns = [];
-  state.contactLists = [];
-  state.contactsByList = new Map();
-  clearStoredSession();
-  hideWorkspace();
-  updateSessionCta();
 }
 
 function activateSection(sectionId) {
@@ -458,24 +300,6 @@ function bindUi() {
 
   document.getElementById("open-workspace-btn").addEventListener("click", showWorkspace);
   document.getElementById("close-workspace-btn").addEventListener("click", hideWorkspace);
-  document.getElementById("logout-btn").addEventListener("click", logout);
-
-  document.getElementById("login-form").addEventListener("submit", async (event) => {
-    event.preventDefault();
-    const form = new FormData(event.currentTarget);
-    const errorEl = document.getElementById("login-error");
-    errorEl.textContent = "";
-    setLoginBusy(true);
-    try {
-      await login(String(form.get("email") || ""), String(form.get("password") || ""));
-      await loadDashboard();
-      showWorkspace();
-    } catch (error) {
-      errorEl.textContent = error.message || "Login failed";
-    } finally {
-      setLoginBusy(false);
-    }
-  });
 
   document.getElementById("broker-form").addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -568,31 +392,13 @@ function bindUi() {
 async function init() {
   bindUi();
 
-  const emailFromQuery = consumeAuthQueryParams();
-  if (emailFromQuery) {
-    const emailInput = document.querySelector('#login-form input[name="email"]');
-    if (emailInput) {
-      emailInput.value = emailFromQuery;
-    }
-  }
-
   await checkServiceHealth();
-
-  const stored = readStoredSession();
-  if (!stored?.token) {
-    updateSessionCta();
-    return;
-  }
-
-  state.session = stored;
-  updateSessionCta();
 
   try {
     await loadDashboard();
     showWorkspace();
   } catch {
-    logout();
-    setServiceState("degraded", "Stored session could not load the workspace. The dashboard backend may be unavailable right now.");
+    setServiceState("degraded", "The dashboard could not load. The backend may be unavailable right now.");
   }
 }
 
