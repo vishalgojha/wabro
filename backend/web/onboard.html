@@ -255,10 +255,12 @@
               <p class="status-message" id="pairing-expiry"></p>
               <div class="phone-row">
                 <button class="primary-btn" id="pairing-new-btn" type="button" style="flex:1">Get a new code</button>
-                <button class="primary-btn hidden" id="pairing-restart-btn" type="button" style="flex:1">Restart linking</button>
               </div>
             </div>
             <p class="status-message error hidden" id="pairing-error"></p>
+            <!-- Restart lives OUTSIDE the code display: a failed request in the
+                 initial (no-code) state must still offer the recovery path. -->
+            <button class="primary-btn hidden" id="pairing-restart-btn" type="button">Restart linking</button>
           </div>
         </div>
 
