@@ -22,8 +22,11 @@ class BaileysConnector extends EventEmitter {
     this.presenceTimeouts = new Map();
   }
 
-  async startSession(sessionId) {
+  async startSession(sessionId, opts = {}) {
     const sessionDir = join(AUTH_DIR, sessionId);
+    const pairingPhone = opts.pairingPhone
+      ? String(opts.pairingPhone).replace(/\D/g, "")
+      : null;
 
     const { state, saveCreds } = await useMultiFileAuthState(sessionDir);
 
@@ -41,11 +44,28 @@ class BaileysConnector extends EventEmitter {
       saveCreds,
       state: "connecting",
       qr: null,
+      pairingCode: null,
       connected: false,
       groups: [],
       presence: "unavailable",
     };
     this.sessions.set(sessionId, session);
+
+    // Code-based linking (user's chosen method over QR): request WhatsApp's
+    // 8-character pairing code once the socket can answer. Only for a
+    // never-registered session; errors surface as session error events.
+    if (pairingPhone && !state.creds.registered) {
+      setTimeout(async () => {
+        try {
+          const code = await sock.requestPairingCode(pairingPhone);
+          session.pairingCode = code;
+          session.state = "pairing_code";
+          this.emit(`pairing_code:${sessionId}`, code);
+        } catch (err) {
+          this.emit(`error:${sessionId}`, `Pairing code request failed: ${err.message}`);
+        }
+      }, 3000);
+    }
 
     sock.ev.on("connection.update", async (update) => {
       const { connection, lastDisconnect, qr } = update;
@@ -320,6 +340,20 @@ class BaileysConnector extends EventEmitter {
 
   getSession(sessionId) {
     return this.sessions.get(sessionId) || null;
+  }
+
+  // Request a pairing code on an existing, still-unpaired session.
+  async requestPairingCode(sessionId, phone) {
+    const session = this.sessions.get(sessionId);
+    if (!session) throw new Error("Session not found");
+    if (session.connected) throw new Error("Session already linked");
+    const normalized = String(phone || "").replace(/\D/g, "");
+    if (normalized.length < 10) throw new Error("phone with country code is required");
+    const code = await session.sock.requestPairingCode(normalized);
+    session.pairingCode = code;
+    session.state = "pairing_code";
+    this.emit(`pairing_code:${sessionId}`, code);
+    return code;
   }
 
   // Close the socket and forget the session WITHOUT unlinking the device

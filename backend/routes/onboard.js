@@ -21,15 +21,27 @@ router.post("/start", async (req, res) => {
   try {
     const email = req.body.email || DEFAULT_EMAIL;
     const sessionId = DEFAULT_SESSION_ID;
+    const pairingPhone = req.body.pairingPhone
+      ? String(req.body.pairingPhone).replace(/\D/g, "")
+      : null;
+    if (req.body.pairingPhone && pairingPhone.length < 10) {
+      return res.status(400).json({ error: "pairingPhone must include country code" });
+    }
 
     const existing = baileysConnector.getSession(sessionId);
     if (existing) {
+      // An unpaired session can still switch to code-based linking on the
+      // same socket; a linked session needs nothing at all.
+      if (pairingPhone && !existing.connected && !existing.pairingCode) {
+        await baileysConnector.requestPairingCode(sessionId, pairingPhone);
+      }
       pendingSessions.set(sessionId, { email, createdAt: Date.now() });
-      return res.json({ sessionId, state: existing.state });
+      const current = baileysConnector.getSession(sessionId);
+      return res.json({ sessionId, state: current.state, pairingCode: current.pairingCode });
     }
 
     pendingSessions.set(sessionId, { email, createdAt: Date.now() });
-    await baileysConnector.startSession(sessionId);
+    await baileysConnector.startSession(sessionId, { pairingPhone });
 
     res.json({ sessionId, state: "connecting" });
   } catch (err) {
@@ -61,9 +73,10 @@ router.get("/status/:sessionId", (req, res) => {
     };
 
     // send current state immediately
-    sendEvent("state", { state: session.state, qr: session.qr });
+    sendEvent("state", { state: session.state, qr: session.qr, pairingCode: session.pairingCode });
 
     const onQR = (qr) => sendEvent("qr", { qr });
+    const onPairingCode = (code) => sendEvent("pairing_code", { code });
     const onConnected = () => sendEvent("connected", {});
     const onGroups = (groups) => {
       sendEvent("groups", { count: groups.length });
@@ -75,6 +88,7 @@ router.get("/status/:sessionId", (req, res) => {
     const onAck = (data) => sendEvent("message_ack", data);
 
     baileysConnector.on(`qr:${sessionId}`, onQR);
+    baileysConnector.on(`pairing_code:${sessionId}`, onPairingCode);
     baileysConnector.on(`connected:${sessionId}`, onConnected);
     baileysConnector.on(`groups:${sessionId}`, onGroups);
     baileysConnector.on(`error:${sessionId}`, onError);
@@ -84,6 +98,7 @@ router.get("/status/:sessionId", (req, res) => {
 
     req.on("close", () => {
       baileysConnector.removeListener(`qr:${sessionId}`, onQR);
+      baileysConnector.removeListener(`pairing_code:${sessionId}`, onPairingCode);
       baileysConnector.removeListener(`connected:${sessionId}`, onConnected);
       baileysConnector.removeListener(`groups:${sessionId}`, onGroups);
       baileysConnector.removeListener(`error:${sessionId}`, onError);
@@ -106,7 +121,8 @@ router.get("/status/:sessionId", (req, res) => {
   res.json({
     sessionId,
     state: session.state,
-    qr: session.qr,
+    qr: session.pairingCode ? null : session.qr,
+    pairingCode: session.pairingCode,
     groupCount: session.groups?.length || 0,
   });
 });
