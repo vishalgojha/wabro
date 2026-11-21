@@ -183,7 +183,11 @@ class ConnectorClient extends EventEmitter {
 
   // Profile edits route through the same approval-gated paths as before.
   async setProfileName() {
-    throw new Error("Profile name changes are not supported by the connector");
+    const err = new Error(
+      "Display-name changes are not available on a linked device. Update the name in the WhatsApp app on the phone instead."
+    );
+    err.code = "NOT_SUPPORTED";
+    throw err;
   }
 
   async setProfileStatus(sessionId, status) {

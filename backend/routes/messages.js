@@ -42,7 +42,9 @@ router.post("/profile/name", async (req, res) => {
     await baileysConnector.setProfileName(sessionId, name);
     res.json({ success: true, name });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    // Honest 501 when the transport cannot do this at all: never pretend
+    // the name was changed when it was not.
+    res.status(err.code === "NOT_SUPPORTED" ? 501 : 500).json({ error: err.message });
   }
 });
 
