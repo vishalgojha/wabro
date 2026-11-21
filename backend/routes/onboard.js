@@ -128,6 +128,7 @@ router.get("/status/:sessionId", (req, res) => {
     const onError = (msg) => sendEvent("error", { message: msg });
     const onLoggedOut = () => sendEvent("logged_out", {});
     const onReconnecting = () => sendEvent("reconnecting", {});
+    const onDisconnected = (info) => sendEvent("disconnected", { reason: info?.reason ?? null });
     const onAck = (data) => sendEvent("message_ack", data);
 
     baileysConnector.on(`qr:${sessionId}`, onQR);
@@ -137,6 +138,7 @@ router.get("/status/:sessionId", (req, res) => {
     baileysConnector.on(`error:${sessionId}`, onError);
     baileysConnector.on(`logged_out:${sessionId}`, onLoggedOut);
     baileysConnector.on(`reconnecting:${sessionId}`, onReconnecting);
+    baileysConnector.on(`disconnected:${sessionId}`, onDisconnected);
     baileysConnector.on(`message.ack:${sessionId}`, onAck);
 
     req.on("close", () => {
@@ -147,6 +149,7 @@ router.get("/status/:sessionId", (req, res) => {
       baileysConnector.removeListener(`error:${sessionId}`, onError);
       baileysConnector.removeListener(`logged_out:${sessionId}`, onLoggedOut);
       baileysConnector.removeListener(`reconnecting:${sessionId}`, onReconnecting);
+      baileysConnector.removeListener(`disconnected:${sessionId}`, onDisconnected);
       baileysConnector.removeListener(`message.ack:${sessionId}`, onAck);
       // Closing the setup tab must NOT unlink the WhatsApp device.
       // A connected session stays alive; only a session that never

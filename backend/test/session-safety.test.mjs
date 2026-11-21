@@ -148,5 +148,114 @@ for (const t of ["upsertBrokerContacts", "generateBroadcastLists", "getGroupArea
 }
 console.log("T6 ok: no stray references to removed machinery");
 
+// ---- T7: close pre-registration clears the dead code, no auto-remint ----
+{
+  const sess = makeFakeSession(false);
+  sess.state = "pairing_code";
+  sess.pairingCode = "ABCD1234";
+  sess.pairingCodeIssuedAt = Date.now();
+  sess.reconnectTimer = null;
+  baileysConnector.sessions.set("t7", sess);
+  let disconnectedPayload = null;
+  baileysConnector.once("disconnected:t7", (pl) => { disconnectedPayload = pl; });
+  baileysConnector.handleConnectionClose("t7", sess, { creds: { registered: false } }, 515);
+  assert.equal(sess.pairingCode, null, "stale code not cleared on close");
+  assert.equal(sess.pairingCodeIssuedAt, null);
+  assert.equal(sess.state, "disconnected", "unregistered close must be truthful disconnected, not fake reconnecting");
+  assert.equal(sess.reconnectTimer, null, "auto-reconnect scheduled for never-registered session");
+  assert.ok(disconnectedPayload, "disconnected event not emitted");
+  baileysConnector.sessions.delete("t7");
+  console.log("T7 ok: close pre-registration clears code, truthful state, no auto-remint/reconnect");
+}
+
+// ---- T8: registered session close schedules bounded reconnect from saved creds ----
+{
+  const sess = makeFakeSession(true);
+  sess.state = "connected";
+  sess.reconnectTimer = null;
+  baileysConnector.sessions.set("t8", sess);
+  let reconnectingFired = false;
+  baileysConnector.once("reconnecting:t8", () => { reconnectingFired = true; });
+  baileysConnector.handleConnectionClose("t8", sess, { creds: { registered: true } }, 515);
+  assert.equal(sess.state, "reconnecting");
+  assert.ok(reconnectingFired, "reconnecting event not emitted");
+  assert.ok(sess.reconnectTimer, "no bounded reconnect scheduled for registered session");
+  clearTimeout(sess.reconnectTimer); sess.reconnectTimer = null;
+  baileysConnector.reconnectAttempts.delete("t8");
+  baileysConnector.sessions.delete("t8");
+  console.log("T8 ok: registered close schedules bounded reconnect");
+}
+
+// ---- T9: attempts exhausted and connectionReplaced never reconnect ----
+{
+  const sess = makeFakeSession(true);
+  sess.reconnectTimer = null;
+  baileysConnector.sessions.set("t9", sess);
+  baileysConnector.reconnectAttempts.set("t9", 3);
+  baileysConnector.handleConnectionClose("t9", sess, { creds: { registered: true } }, 428);
+  assert.equal(sess.state, "disconnected");
+  assert.equal(sess.reconnectTimer, null);
+  const sess2 = makeFakeSession(true);
+  sess2.reconnectTimer = null;
+  baileysConnector.sessions.set("t9b", sess2);
+  baileysConnector.handleConnectionClose("t9b", sess2, { creds: { registered: true } }, 440);
+  assert.equal(sess2.state, "disconnected");
+  assert.equal(sess2.reconnectTimer, null, "connectionReplaced must never reconnect");
+  baileysConnector.sessions.delete("t9"); baileysConnector.sessions.delete("t9b");
+  baileysConnector.reconnectAttempts.delete("t9"); baileysConnector.reconnectAttempts.delete("t9b");
+  console.log("T9 ok: exhausted attempts and connectionReplaced both disconnect without reconnect");
+}
+
+// ---- T10: stale socket callback cannot clobber the live session ----
+{
+  const oldSess = makeFakeSession(false);
+  oldSess.reconnectTimer = null;
+  oldSess.pairingCode = "ZZZZ9999";
+  const newSess = makeFakeSession(true);
+  baileysConnector.sessions.set("t10", newSess);
+  baileysConnector.handleConnectionClose("t10", oldSess, { creds: { registered: false } }, 515);
+  assert.equal(newSess.state, "connected", "stale close mutated the live session");
+  assert.equal(oldSess.pairingCode, "ZZZZ9999", "stale socket state should be untouched");
+  baileysConnector.sessions.delete("t10");
+  console.log("T10 ok: stale socket close is ignored");
+}
+
+// ---- T11: disconnect() cancels a pending bounded reconnect ----
+{
+  const sess = makeFakeSession(true);
+  sess.reconnectTimer = null;
+  baileysConnector.sessions.set("t11", sess);
+  baileysConnector.handleConnectionClose("t11", sess, { creds: { registered: true } }, 408);
+  assert.ok(sess.reconnectTimer, "expected pending reconnect before disconnect");
+  await baileysConnector.disconnect("t11");
+  assert.equal(sess.reconnectTimer, null, "disconnect did not cancel pending reconnect");
+  assert.equal(baileysConnector.sessions.get("t11"), undefined);
+  console.log("T11 ok: disconnect cancels pending reconnect");
+}
+
+// ---- T12: logout cancels a pending bounded reconnect and resets the attempt budget ----
+{
+  const sess = makeFakeSession(true);
+  sess.reconnectTimer = null;
+  baileysConnector.sessions.set("t12", sess);
+  baileysConnector.handleConnectionClose("t12", sess, { creds: { registered: true } }, 408);
+  assert.ok(sess.reconnectTimer, "expected pending reconnect before logout");
+  assert.equal(baileysConnector.reconnectAttempts.get("t12"), 1);
+  await baileysConnector.logout("t12");
+  assert.equal(sess.reconnectTimer, null, "logout did not cancel pending reconnect");
+  assert.equal(baileysConnector.reconnectAttempts.get("t12"), undefined, "logout left stale attempt budget");
+  assert.equal(baileysConnector.sessions.get("t12"), undefined);
+  // A fresh session on the same id starts with a full budget again
+  const fresh = makeFakeSession(true);
+  fresh.reconnectTimer = null;
+  baileysConnector.sessions.set("t12", fresh);
+  baileysConnector.handleConnectionClose("t12", fresh, { creds: { registered: true } }, 408);
+  assert.equal(baileysConnector.reconnectAttempts.get("t12"), 1, "same-id session inherited exhausted attempts");
+  clearTimeout(fresh.reconnectTimer); fresh.reconnectTimer = null;
+  baileysConnector.reconnectAttempts.delete("t12");
+  baileysConnector.sessions.delete("t12");
+  console.log("T12 ok: logout cancels pending reconnect and resets attempt budget");
+}
+
 console.log("\nALL TESTS PASSED");
 process.exit(0);

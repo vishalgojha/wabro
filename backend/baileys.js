@@ -15,7 +15,15 @@ export const DEFAULT_SESSION_ID = "default";
 
 const PRESENCE_AUTO_ONLINE_DURATION = 30_000; // 30 seconds
 
+// Bounded reconnects for a REGISTERED session whose socket closed
+// (WhatsApp's 515 restartRequired after a successful phone-side pairing is
+// one such close). Never applies to never-registered sessions: re-minting a
+// pairing code is always an explicit user action.
+const MAX_RECONNECT_ATTEMPTS = 3;
+
 class BaileysConnector extends EventEmitter {
+  reconnectAttempts = new Map();
+
   constructor() {
     super();
     this.sessions = new Map();
@@ -49,6 +57,7 @@ class BaileysConnector extends EventEmitter {
       connected: false,
       groups: [],
       presence: "unavailable",
+      reconnectTimer: null,
     };
     this.sessions.set(sessionId, session);
 
@@ -82,6 +91,7 @@ class BaileysConnector extends EventEmitter {
         session.state = "connected";
         session.connected = true;
         session.qr = null;
+        this.reconnectAttempts.delete(sessionId);
         this.emit(`connected:${sessionId}`);
 
         try {
@@ -103,9 +113,7 @@ class BaileysConnector extends EventEmitter {
           rmSync(sessionDir, { recursive: true, force: true });
           return;
         }
-        // reconnecting handled by baileys internally
-        session.state = "reconnecting";
-        this.emit(`reconnecting:${sessionId}`);
+        this.handleConnectionClose(sessionId, session, state, reason);
       }
     });
 
@@ -379,6 +387,61 @@ class BaileysConnector extends EventEmitter {
     return code;
   }
 
+  // A socket closed without logout. Baileys does NOT reconnect by itself,
+  // so the old behavior ("reconnecting handled internally") left every
+  // session permanently dead after its first close while claiming to
+  // reconnect. Rules:
+  //  - A pairing code is bound to the socket that minted it: once the
+  //    socket closes the code can never complete, so it is cleared
+  //    immediately and the UI is told, instead of showing a dead code.
+  //  - A REGISTERED session reconnects from its saved creds, bounded
+  //    (this is also the path that finishes a good pairing: WhatsApp
+  //    closes with 515 after the phone accepts the code). Codes are
+  //    never auto-reminted behind the user.
+  //  - A never-registered session (mid-pairing) gets a truthful
+  //    "disconnected"; only an explicit user restart requests a new code.
+  handleConnectionClose(sessionId, session, authState, reason) {
+    // Ignore events from a stale socket after a fresh start replaced it.
+    if (this.sessions.get(sessionId) !== session) return;
+    if (session.pairingCode) {
+      session.pairingCode = null;
+      session.pairingCodeIssuedAt = null;
+    }
+    if (reason === DisconnectReason.connectionReplaced) {
+      // Another live instance owns this session; never fight it.
+      session.state = "disconnected";
+      console.warn(`[wabro] session ${sessionId} closed: connection replaced; not reconnecting`);
+      this.emit(`disconnected:${sessionId}`, { reason: reason ?? null });
+      return;
+    }
+    const wasRegistered = !!authState?.creds?.registered;
+    const attempts = this.reconnectAttempts.get(sessionId) || 0;
+    if (wasRegistered && attempts < MAX_RECONNECT_ATTEMPTS) {
+      this.reconnectAttempts.set(sessionId, attempts + 1);
+      session.state = "reconnecting";
+      this.emit(`reconnecting:${sessionId}`);
+      const delay = Math.min(1000 * 2 ** (attempts + 1), 15000);
+      console.warn(`[wabro] session ${sessionId} closed (status ${reason ?? "unknown"}); bounded reconnect ${attempts + 1}/${MAX_RECONNECT_ATTEMPTS} from saved creds`);
+      session.reconnectTimer = setTimeout(() => {
+        session.reconnectTimer = null;
+        if (this.sessions.get(sessionId) !== session) return;
+        this.startSession(sessionId, {}).catch((err) => {
+          console.warn(`[wabro] session ${sessionId} reconnect failed: ${err.message}`);
+          const current = this.sessions.get(sessionId);
+          if (current) {
+            current.state = "disconnected";
+            this.emit(`disconnected:${sessionId}`, { reason: null });
+          }
+        });
+      }, delay);
+      if (session.reconnectTimer.unref) session.reconnectTimer.unref();
+      return;
+    }
+    session.state = "disconnected";
+    console.warn(`[wabro] session ${sessionId} closed (status ${reason ?? "unknown"}); no auto-reconnect (${wasRegistered ? "reconnect attempts exhausted" : "session never registered"})`);
+    this.emit(`disconnected:${sessionId}`, { reason: reason ?? null });
+  }
+
   // Close the socket and forget the session WITHOUT unlinking the device
   // from WhatsApp. Used only for abandoned sessions that never paired
   // (e.g. the setup tab closed before the QR was scanned).
@@ -386,6 +449,11 @@ class BaileysConnector extends EventEmitter {
     this.cleanupPresenceTimeout(sessionId);
     const session = this.sessions.get(sessionId);
     if (session) {
+      if (session.reconnectTimer) {
+        clearTimeout(session.reconnectTimer);
+        session.reconnectTimer = null;
+      }
+      this.reconnectAttempts.delete(sessionId);
       try {
         session.sock?.ws?.close();
       } catch {}
@@ -400,6 +468,14 @@ class BaileysConnector extends EventEmitter {
     this.cleanupPresenceTimeout(sessionId);
     const session = this.sessions.get(sessionId);
     if (session) {
+      // Same cleanup contract as disconnect(): a pending bounded reconnect
+      // must not fire into (or exhaust the attempt budget of) whatever
+      // session later reuses this id.
+      if (session.reconnectTimer) {
+        clearTimeout(session.reconnectTimer);
+        session.reconnectTimer = null;
+      }
+      this.reconnectAttempts.delete(sessionId);
       try {
         session.sock?.ws?.close();
         await session.sock?.logout();
