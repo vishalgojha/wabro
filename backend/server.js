@@ -5,8 +5,11 @@ import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import onboardRouter from "./routes/onboard.js";
 import messagesRouter from "./routes/messages.js";
+import outreachRouter from "./routes/outreach.js";
+import { baileysConnector, AUTH_DIR, DEFAULT_SESSION_ID } from "./baileys.js";
 import {
   getStats,
+  reconcileOutreachState,
   createUser,
   getOrCreateWorkspace,
   getBroadcastLists,
@@ -46,6 +49,36 @@ app.get("/wabro/app/setup.html", (req, res) => {
 
 app.use("/api/wabro/onboard", onboardRouter);
 app.use("/api/wabro/messages", messagesRouter);
+app.use("/api/wabro/outreach", outreachRouter);
+
+// Session state for operators: is the linked device connected right now?
+app.get("/api/wabro/session", (req, res) => {
+  const session = baileysConnector.getSession(DEFAULT_SESSION_ID);
+  const hasStoredCreds = existsSync(join(AUTH_DIR, DEFAULT_SESSION_ID, "creds.json"));
+  res.json({
+    sessionId: DEFAULT_SESSION_ID,
+    state: session ? session.state : hasStoredCreds ? "stored_offline" : "none",
+    connected: !!(session && session.connected),
+  });
+});
+
+// Boot reconciliation: a restart kills in-memory sender loops. Park
+// interrupted batches and mark in-flight recipients uncertain BEFORE the
+// session restore can reconnect, so nothing resumes or retries blindly.
+const reconciled = reconcileOutreachState();
+if (reconciled.batchesParked || reconciled.recipientsParked) {
+  console.log(
+    `Outreach reconciliation: parked ${reconciled.batchesParked} batch(es), ${reconciled.recipientsParked} in-flight recipient(s) marked uncertain`
+  );
+}
+
+// Boot restore: a previously linked device comes back online without a new
+// QR scan. Only the stable default session is restored.
+if (existsSync(join(AUTH_DIR, DEFAULT_SESSION_ID, "creds.json"))) {
+  baileysConnector
+    .startSession(DEFAULT_SESSION_ID)
+    .catch((err) => console.error("Session restore failed:", err.message));
+}
 
 app.get("/api/wabro/dashboard/stats", (req, res) => {
   const email = req.query.email || DEFAULT_EMAIL;

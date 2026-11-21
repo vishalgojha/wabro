@@ -67,6 +67,48 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_blc_list ON broadcast_list_contacts(broadcast_list_id);
   CREATE INDEX IF NOT EXISTS idx_blc_workspace ON broadcast_list_contacts(workspace_id);
   CREATE INDEX IF NOT EXISTS idx_blc_phone ON broadcast_list_contacts(phone);
+
+  CREATE TABLE IF NOT EXISTS outreach_batches (
+    id TEXT PRIMARY KEY,
+    text TEXT NOT NULL,
+    text_hash TEXT NOT NULL,
+    recipient_hash TEXT NOT NULL,
+    approval_ref TEXT NOT NULL UNIQUE,
+    approval_channel TEXT NOT NULL,
+    approved_at TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'approved',
+    pacing_ms INTEGER NOT NULL DEFAULT 5000,
+    input_count INTEGER NOT NULL DEFAULT 0,
+    note TEXT DEFAULT '',
+    created_at TEXT DEFAULT (datetime('now')),
+    started_at TEXT,
+    finished_at TEXT
+  );
+
+  CREATE TABLE IF NOT EXISTS outreach_recipients (
+    batch_id TEXT NOT NULL REFERENCES outreach_batches(id),
+    phone TEXT NOT NULL,
+    name TEXT DEFAULT '',
+    status TEXT NOT NULL DEFAULT 'pending',
+    forced INTEGER NOT NULL DEFAULT 0,
+    message_id TEXT,
+    error TEXT,
+    sent_at TEXT,
+    PRIMARY KEY (batch_id, phone)
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_outreach_recipients_batch ON outreach_recipients(batch_id, status);
+  CREATE INDEX IF NOT EXISTS idx_outreach_recipients_msgid ON outreach_recipients(message_id);
+
+  CREATE TABLE IF NOT EXISTS outreach_send_log (
+    phone TEXT NOT NULL,
+    text_hash TEXT NOT NULL,
+    batch_id TEXT NOT NULL,
+    sent_at TEXT DEFAULT (datetime('now')),
+    PRIMARY KEY (phone, text_hash, batch_id)
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_send_log_phone_hash ON outreach_send_log(phone, text_hash, sent_at);
 `);
 
 export function upsertBrokerContacts(contacts) {
@@ -252,6 +294,175 @@ export function getStats(workspaceId) {
     total_contacts: totalContacts?.count || 0,
     total_areas: areaCounts,
   };
+}
+
+
+// ---- Outreach batches ----------------------------------------------------
+
+export function createOutreachBatch({ id, text, textHash, recipientHash, approvalRef, approvalChannel, approvedAt, pacingMs, inputCount }) {
+  db.prepare(`
+    INSERT INTO outreach_batches
+      (id, text, text_hash, recipient_hash, approval_ref, approval_channel, approved_at, pacing_ms, input_count)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(id, text, textHash, recipientHash, approvalRef, approvalChannel, approvedAt, pacingMs, inputCount || 0);
+}
+
+export function getOutreachBatch(id) {
+  return db.prepare("SELECT * FROM outreach_batches WHERE id = ?").get(id);
+}
+
+export function listOutreachBatches(limit = 50) {
+  return db.prepare("SELECT * FROM outreach_batches ORDER BY created_at DESC LIMIT ?").all(limit);
+}
+
+export function setBatchStatus(id, status, opts = {}) {
+  const sets = ["status = @status"];
+  const params = { id, status, note: opts.note || null };
+  if (opts.note) sets.push("note = @note");
+  if (opts.startedAt) sets.push("started_at = COALESCE(started_at, datetime('now'))");
+  if (opts.finishedAt) sets.push("finished_at = datetime('now')");
+  db.prepare(`UPDATE outreach_batches SET ${sets.join(", ")} WHERE id = @id`).run(params);
+}
+
+export function insertOutreachRecipient(batchId, phone, name, status, forced = false) {
+  db.prepare(`
+    INSERT OR IGNORE INTO outreach_recipients (batch_id, phone, name, status, forced)
+    VALUES (?, ?, ?, ?, ?)
+  `).run(batchId, phone, name || "", status, forced ? 1 : 0);
+}
+
+export function getOutreachRecipients(batchId) {
+  return db.prepare("SELECT * FROM outreach_recipients WHERE batch_id = ? ORDER BY rowid ASC").all(batchId);
+}
+
+export function getNextPendingRecipient(batchId) {
+  return db.prepare(
+    "SELECT * FROM outreach_recipients WHERE batch_id = ? AND status = 'pending' ORDER BY rowid ASC LIMIT 1"
+  ).get(batchId);
+}
+
+export function countPendingRecipients(batchId) {
+  return db.prepare(
+    "SELECT COUNT(*) AS c FROM outreach_recipients WHERE batch_id = ? AND status = 'pending'"
+  ).get(batchId).c;
+}
+
+export function markRecipientSent(batchId, phone, messageId) {
+  db.prepare(`
+    UPDATE outreach_recipients SET status = 'sent', message_id = ?, sent_at = datetime('now')
+    WHERE batch_id = ? AND phone = ?
+  `).run(messageId, batchId, phone);
+}
+
+export function markRecipientFailed(batchId, phone, error) {
+  db.prepare(`
+    UPDATE outreach_recipients SET status = 'failed', error = ?
+    WHERE batch_id = ? AND phone = ?
+  `).run(error, batchId, phone);
+}
+
+// Delivery/read receipts upgrade a sent recipient; never downgrade.
+export function markAckByMessageId(messageId, ackStatus) {
+  if (ackStatus >= 4) {
+    db.prepare(
+      "UPDATE outreach_recipients SET status = 'read' WHERE message_id = ? AND status IN ('sent', 'delivered')"
+    ).run(messageId);
+  } else if (ackStatus >= 3) {
+    db.prepare(
+      "UPDATE outreach_recipients SET status = 'delivered' WHERE message_id = ? AND status = 'sent'"
+    ).run(messageId);
+  }
+}
+
+export function logSend(phone, textHash, batchId) {
+  db.prepare(`
+    INSERT OR IGNORE INTO outreach_send_log (phone, text_hash, batch_id) VALUES (?, ?, ?)
+  `).run(phone, textHash, batchId);
+}
+
+export function findRecentSend(phone, textHash, sinceIso) {
+  return db.prepare(`
+    SELECT * FROM outreach_send_log
+    WHERE phone = ? AND text_hash = ? AND sent_at >= ?
+    ORDER BY sent_at DESC LIMIT 1
+  `).get(phone, textHash, sinceIso);
+}
+
+export function isOptedOut(phone) {
+  const row = db.prepare("SELECT opted_out FROM broker_contacts WHERE phone = ?").get(phone);
+  return !!(row && row.opted_out);
+}
+
+
+export function getBatchByApprovalRef(ref) {
+  return db.prepare("SELECT id FROM outreach_batches WHERE approval_ref = ?").get(ref);
+}
+
+// Mark a recipient as actively being sent BEFORE the attempt, so a restart
+// mid-flight leaves durable evidence instead of a false "pending".
+export function markRecipientSending(batchId, phone) {
+  db.prepare(`
+    UPDATE outreach_recipients SET status = 'sending'
+    WHERE batch_id = ? AND phone = ? AND status = 'pending'
+  `).run(batchId, phone);
+}
+
+// Ambiguous outcomes are parked, never retried automatically: the message
+// may already have reached WhatsApp.
+export function markRecipientUncertain(batchId, phone, error) {
+  db.prepare(`
+    UPDATE outreach_recipients SET status = 'uncertain', error = ?
+    WHERE batch_id = ? AND phone = ?
+  `).run(error, batchId, phone);
+}
+
+// Operator resolution of a parked recipient after checking out of band.
+export function resolveUncertainRecipient(batchId, phone, outcome) {
+  const current = db.prepare(
+    "SELECT status FROM outreach_recipients WHERE batch_id = ? AND phone = ?"
+  ).get(batchId, phone);
+  if (!current) return undefined;
+  if (current.status !== "uncertain") return null;
+  const status = outcome === "sent" ? "sent" : "failed";
+  db.prepare(`
+    UPDATE outreach_recipients SET status = ?, sent_at = CASE WHEN ? = 'sent' THEN datetime('now') ELSE sent_at END
+    WHERE batch_id = ? AND phone = ?
+  `).run(status, status, batchId, phone);
+  return db.prepare("SELECT * FROM outreach_recipients WHERE batch_id = ? AND phone = ?").get(batchId, phone);
+}
+
+export function findUncertainPrior(phone) {
+  return db.prepare(`
+    SELECT r.batch_id, r.sent_at, r.error, b.created_at AS batch_created_at
+    FROM outreach_recipients r JOIN outreach_batches b ON b.id = r.batch_id
+    WHERE r.phone = ? AND r.status = 'uncertain'
+    ORDER BY r.rowid DESC LIMIT 1
+  `).get(phone);
+}
+
+// Boot reconciliation: a restart kills in-memory sender loops. Anything
+// still marked sending/approved was interrupted; park it. "sending"
+// recipients are uncertain (their send may have landed) and are excluded
+// from any later automatic resume.
+export function reconcileOutreachState() {
+  const batches = db.prepare(`
+    UPDATE outreach_batches SET status = 'paused', note = 'interrupted_by_restart'
+    WHERE status IN ('sending', 'approved')
+  `).run();
+  const recipients = db.prepare(`
+    UPDATE outreach_recipients SET status = 'uncertain'
+    WHERE status = 'sending'
+  `).run();
+  return { batchesParked: batches.changes, recipientsParked: recipients.changes };
+}
+
+export function batchCounts(batchId) {
+  const rows = db.prepare(
+    "SELECT status, COUNT(*) AS c FROM outreach_recipients WHERE batch_id = ? GROUP BY status"
+  ).all(batchId);
+  const counts = {};
+  for (const r of rows) counts[r.status] = r.c;
+  return counts;
 }
 
 export default db;

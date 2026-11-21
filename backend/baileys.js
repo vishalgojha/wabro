@@ -3,9 +3,15 @@ import pino from "pino";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { EventEmitter } from "node:events";
+import { rmSync } from "node:fs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const AUTH_DIR = join(__dirname, "auth");
+export const AUTH_DIR = join(__dirname, "auth");
+
+// One stable linked device per deployment. The auth state for this id is
+// persisted under AUTH_DIR and restored on boot, so a container restart
+// never mints a new WhatsApp device link.
+export const DEFAULT_SESSION_ID = "default";
 
 const PRESENCE_AUTO_ONLINE_DURATION = 30_000; // 30 seconds
 
@@ -70,6 +76,9 @@ class BaileysConnector extends EventEmitter {
           session.state = "logged_out";
           this.emit(`logged_out:${sessionId}`);
           this.sessions.delete(sessionId);
+          // The link is dead: drop stored creds so the next start mints a
+          // fresh QR instead of restoring a logged-out device.
+          rmSync(sessionDir, { recursive: true, force: true });
           return;
         }
         // reconnecting handled by baileys internally

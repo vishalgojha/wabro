@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { baileysConnector } from "../baileys.js";
+import { baileysConnector, DEFAULT_SESSION_ID } from "../baileys.js";
 import {
   getStats,
   createUser,
@@ -15,16 +15,23 @@ const pendingSessions = new Map(); // sessionId -> { userEmail, resolve, timeout
 const DEFAULT_EMAIL = "guest@wabro.local";
 
 // POST /api/wabro/onboard/start
+// Always the stable default session: restarting onboarding reconnects the
+// same device link (or restores stored creds) instead of minting a new one.
 router.post("/start", async (req, res) => {
   try {
     const email = req.body.email || DEFAULT_EMAIL;
+    const sessionId = DEFAULT_SESSION_ID;
 
-    const sessionId = crypto.randomUUID();
+    const existing = baileysConnector.getSession(sessionId);
+    if (existing) {
+      pendingSessions.set(sessionId, { email, createdAt: Date.now() });
+      return res.json({ sessionId, state: existing.state });
+    }
+
     pendingSessions.set(sessionId, { email, createdAt: Date.now() });
-
     await baileysConnector.startSession(sessionId);
 
-    res.json({ sessionId });
+    res.json({ sessionId, state: "connecting" });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

@@ -98,6 +98,9 @@ assert.equal(fake.sock.ws.closed, false, "tab close closed the socket");
 console.log("T4 ok: paired session survives tab close, socket open, no unlink");
 
 // ---- T4b: tab close abandons a never-paired session WITHOUT logout ------
+// Fresh-state simulation: no session in memory (e.g. after a server restart
+// with no stored creds), so /start creates the stable default session.
+baileysConnector.sessions.delete(sid);
 baileysConnector.startSession = async (sessionId) => {
   baileysConnector.sessions.set(sessionId, makeFakeSession(false)); // QR never scanned
   return sessionId;
@@ -105,6 +108,7 @@ baileysConnector.startSession = async (sessionId) => {
 const start2 = await (await fetch(`${BASE}/api/wabro/onboard/start`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" })).json();
 const sid2 = start2.sessionId;
 const fake2 = baileysConnector.getSession(sid2);
+assert.equal(sid2, sid, "onboarding must reuse the stable default session id");
 const sse2 = new AbortController();
 await fetch(`${BASE}/api/wabro/onboard/status/${sid2}?events=1`, { signal: sse2.signal });
 sse2.abort();
@@ -113,10 +117,22 @@ assert.equal(baileysConnector.getSession(sid2), null, "abandoned QR session ling
 assert.equal(fake2.sock.logoutCalls, 0, "abandon path unlinked a device");
 console.log("T4b ok: never-paired session abandoned without logout");
 
+// ---- T4c: a second /start returns the existing session, never a new one -
+baileysConnector.startSession = async (sessionId) => {
+  baileysConnector.sessions.set(sessionId, makeFakeSession(true));
+  return sessionId;
+};
+const start3 = await (await fetch(`${BASE}/api/wabro/onboard/start`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" })).json();
+const start4 = await (await fetch(`${BASE}/api/wabro/onboard/start`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" })).json();
+assert.equal(start3.sessionId, start4.sessionId, "repeat onboarding minted a second session");
+assert.equal(start4.state, "connected", "repeat onboarding should report the live session state");
+const fake3 = baileysConnector.getSession(start3.sessionId);
+console.log("T4c ok: repeat onboarding reuses the stable session");
+
 // ---- T5: explicit logout endpoint unlinks, and only it ------------------
 const lo = await (await fetch(`${BASE}/api/wabro/onboard/logout`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ sessionId: sid }) })).json();
 assert.equal(lo.success, true);
-assert.equal(fake.sock.logoutCalls, 1, "explicit logout did not unlink exactly once");
+assert.equal(fake3.sock.logoutCalls, 1, "explicit logout did not unlink exactly once");
 assert.equal(baileysConnector.getSession(sid), null, "session survived explicit logout");
 const lo404 = await (await fetch(`${BASE}/api/wabro/onboard/logout`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ sessionId: sid }) }));
 assert.equal(lo404.status, 404);
