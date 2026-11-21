@@ -188,7 +188,7 @@ function startSSE(sid) {
 
   eventSource.addEventListener("groups", (e) => {
     const data = JSON.parse(e.data);
-    $("scan-progress").textContent = `Found ${data.count} groups. Building broker network...`;
+    $("scan-progress").textContent = `Found ${data.count} groups on your account.`;
   });
 
   eventSource.addEventListener("error", (e) => {
@@ -202,6 +202,13 @@ function startSSE(sid) {
 
   eventSource.addEventListener("reconnecting", () => {
     $("qr-status").textContent = "Connection lost. Reconnecting...";
+  });
+
+  eventSource.addEventListener("disconnected", () => {
+    // The socket died before linking finished, so any code it minted died
+    // with it. Never leave a dead code on screen as if it were usable.
+    $("pairing-code-display").classList.add("hidden");
+    showPairingError("Connection was lost before linking finished, so that code is no longer valid. Tap Restart linking for a fresh one.", true);
   });
 
   eventSource.onerror = () => {

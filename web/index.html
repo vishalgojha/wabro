@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
         name="description"
-        content="WaBro is a dedicated broadcast product for broker campaigns. Create campaigns, connect WhatsApp from the browser, and track delivery from one place."
+        content="WaBro is a private WhatsApp outreach tool. Link WhatsApp from the browser and send approved message batches through the linked number."
     />
     <title>WaBro</title>
     <link rel="stylesheet" href="./styles.css" />
@@ -18,13 +18,12 @@
                     <span class="brand-mark">WB</span>
                     <div>
                         <strong>WaBro</strong>
-                        <span>Broadcast Campaign Hub</span>
+                        <span>Personal WhatsApp Outreach</span>
                     </div>
                 </a>
 
                 <nav class="header-actions">
                     <a class="ghost-btn" href="#how-it-works">How It Works</a>
-                    <a class="ghost-btn" href="#pricing">Pricing</a>
                     <a class="ghost-btn" href="https://app.propai.live">PropAI</a>
                     <a class="primary-btn" href="/wabro/app/setup">Connect WhatsApp</a>
                 </nav>
@@ -35,20 +34,20 @@
             <section class="hero-shell" id="top">
                 <div class="container hero-grid">
                     <div class="hero-copy-block">
-                        <p class="eyebrow">Dedicated paid product</p>
-                        <h1>Broadcast campaigns from web. Send via your linked WhatsApp.</h1>
+                        <p class="eyebrow">Private personal tool</p>
+                        <h1>Approved WhatsApp outreach, sent through your own linked number.</h1>
                         <p class="hero-copy">
-                            WaBro is a separate broadcast tool for broker outreach. Build contact lists, connect WhatsApp with a
-                            QR scan, launch campaigns, and track delivery health — all from the browser.
+                            WaBro is a private outreach tool operated with the Instinct assistant. Link WhatsApp once, then
+                            send batches whose recipients and exact message text were approved first. Nothing sends without that approval.
                         </p>
                         <div class="hero-buttons">
                             <a class="btn btn-primary" href="/wabro/app/setup">Connect WhatsApp</a>
                             <a class="btn btn-outline" href="#dashboard-access">Open Dashboard</a>
                         </div>
                         <div class="hero-pills">
-                            <span class="pill">Rs 499/year</span>
-                            <span class="pill">Web delivery</span>
-                            <span class="pill">Broker broadcasts</span>
+                            <span class="pill">Private tool</span>
+                            <span class="pill">Approval-bound sends</span>
+                            <span class="pill">Pairing-code linking</span>
                         </div>
                     </div>
 
@@ -60,9 +59,9 @@
 
                         <div class="auth-card" id="auth-card">
                             <p class="eyebrow">WaBro Dashboard</p>
-                            <h2>Open the campaign dashboard</h2>
+                            <h2>Open the dashboard</h2>
                             <p class="auth-copy">
-                                Protected by a password. Signed-in users can manage broker lists and WhatsApp connection status.
+                                Protected by a password. Inside: live WhatsApp connection status and contact counts. Batch results come back in chat; a read-only batch view is not available yet.
                             </p>
                             <button class="primary-btn" id="open-workspace-btn" type="button">Open Workspace</button>
                         </div>
@@ -74,28 +73,28 @@
                 <div class="container">
                     <div class="section-heading">
                         <p class="eyebrow">What WaBro Does</p>
-                        <h2>Built for outbound campaigns, not general WhatsApp operations</h2>
+                        <h2>Built for approved outreach, not general WhatsApp operations</h2>
                         <p>
-                            WaBro is the broadcast product surface. Linking (QR or pairing code) happens on the setup page;
-                            it does not do chat parsing or inbox work. Its job is approved outreach delivery.
+                            Linking (pairing code or QR) happens on the setup page. WaBro sends approved batches through the
+                            linked number; it does not read chats or run an inbox.
                         </p>
                     </div>
 
                     <div class="feature-grid">
                         <article class="feature-card">
-                            <div class="feature-tag">Campaigns</div>
-                            <h3>Create and launch outreach campaigns</h3>
-                            <p>Build message templates, organize broker lists, and launch broadcast operations from the web dashboard.</p>
+                            <div class="feature-tag">Batches</div>
+                            <h3>Approval-bound send batches</h3>
+                            <p>A batch goes out only with the recipients and exact message text approved for it. That approval record is stored with the batch.</p>
                         </article>
                         <article class="feature-card">
                             <div class="feature-tag">Execution</div>
                             <h3>Run delivery from the browser</h3>
-                            <p>Link your WhatsApp account once with a QR scan. WaBro sends campaigns directly from the server.</p>
+                            <p>Link WhatsApp once with a pairing code or QR from the browser. Approved batches are then sent by the server through that link.</p>
                         </article>
                         <article class="feature-card">
                             <div class="feature-tag">Tracking</div>
-                            <h3>Monitor sent, failed, and skipped counts</h3>
-                            <p>Track live campaign progress and know when your WhatsApp link is active without mixing in chat inbox features.</p>
+                            <h3>See what is real, hide what is not</h3>
+                            <p>Live connection status and batch progress are shown. Numbers the backend cannot track yet are marked "Not available yet" instead of showing fake zeros.</p>
                         </article>
                     </div>
                 </div>
@@ -105,7 +104,7 @@
                 <div class="container">
                     <div class="section-heading">
                         <p class="eyebrow">How It Works</p>
-                        <h2>One product hub for setup, download, and campaign execution</h2>
+                        <h2>One place to link WhatsApp and watch approved sends</h2>
                     </div>
 
                     <div class="step-grid">
@@ -117,49 +116,31 @@
                         <article class="step-card">
                             <span class="step-number">2</span>
                             <h3>Manage from the web</h3>
-                            <p>Use the dashboard with the site password. Manage broker lists and your WhatsApp connection.</p>
+                            <p>Use the password-protected dashboard to check the WhatsApp link and view contacts and batches.</p>
                         </article>
                         <article class="step-card">
                             <span class="step-number">3</span>
-                            <h3>Import broker lists</h3>
-                            <p>Add contacts one by one or paste bulk broker rows in <code>name, phone, locality</code> format.</p>
+                            <h3>Recipients per batch</h3>
+                            <p>Reusable list building is not available yet. Recipients are supplied and approved per batch.</p>
                         </article>
                         <article class="step-card">
                             <span class="step-number">4</span>
-                            <h3>Launch campaigns</h3>
-                            <p>Create message templates on the web and push campaigns through your linked WhatsApp connection.</p>
+                            <h3>Send approved batches</h3>
+                            <p>Batches are prepared and approved in chat with Instinct, then sent through the linked number.</p>
                         </article>
                     </div>
                 </div>
             </section>
 
-            <section class="section" id="pricing">
-                <div class="container">
-                    <div class="pricing-card">
-                        <div>
-                            <p class="eyebrow">Plan</p>
-                            <h2>WaBro yearly access</h2>
-                            <p class="pricing-copy">
-                                WaBro is a separate paid service for broker broadcast campaigns. Keep the product boundary explicit.
-                            </p>
-                        </div>
-                        <div class="pricing-panel">
-                            <strong>Rs 499</strong>
-                            <span>per year</span>
-                            <a class="primary-btn" href="/wabro/app/setup">Get Started</a>
-                        </div>
-                    </div>
-                </div>
-            </section>
 
             <section class="workspace-shell hidden" id="workspace-shell">
                 <div class="container">
                     <section class="workspace-hero">
                         <div>
                             <p class="eyebrow">WaBro Workspace</p>
-                            <h2>Campaign dashboard</h2>
+                            <h2>Dashboard</h2>
                             <p class="workspace-copy">
-                                Manage broadcast campaigns, broker lists, and your linked WhatsApp connection.
+                                Live WhatsApp connection status and contacts. Batch results are returned in chat.
                             </p>
                         </div>
                         <div class="workspace-actions">
