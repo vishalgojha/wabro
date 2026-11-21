@@ -4,7 +4,6 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import onboardRouter from "./routes/onboard.js";
 import messagesRouter from "./routes/messages.js";
-import { initBot } from "./bot.js";
 import {
   getStats,
   createUser,
@@ -42,8 +41,6 @@ app.get("/wabro/app/setup.html", (req, res) => {
 
 app.use("/api/wabro/onboard", onboardRouter);
 app.use("/api/wabro/messages", messagesRouter);
-
-initBot();
 
 app.get("/api/wabro/dashboard/stats", (req, res) => {
   const email = req.query.email || DEFAULT_EMAIL;

@@ -313,7 +313,24 @@ class BaileysConnector extends EventEmitter {
     return this.sessions.get(sessionId) || null;
   }
 
-  async cleanup(sessionId) {
+  // Close the socket and forget the session WITHOUT unlinking the device
+  // from WhatsApp. Used only for abandoned sessions that never paired
+  // (e.g. the setup tab closed before the QR was scanned).
+  async disconnect(sessionId) {
+    this.cleanupPresenceTimeout(sessionId);
+    const session = this.sessions.get(sessionId);
+    if (session) {
+      try {
+        session.sock?.ws?.close();
+      } catch {}
+      this.sessions.delete(sessionId);
+    }
+  }
+
+  // Full unlink: closes the socket AND logs the device out of WhatsApp.
+  // Call only from the explicit logout endpoint - never on tab close,
+  // never automatically after onboarding.
+  async logout(sessionId) {
     this.cleanupPresenceTimeout(sessionId);
     const session = this.sessions.get(sessionId);
     if (session) {

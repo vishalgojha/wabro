@@ -1,16 +1,12 @@
 import { Router } from "express";
 import { baileysConnector } from "../baileys.js";
 import {
-  upsertBrokerContacts,
-  getBrokerContacts,
-  generateBroadcastLists,
   getStats,
   createUser,
   getOrCreateWorkspace,
   optOutBroker,
   getBroadcastLists,
 } from "../db.js";
-import { getGroupAreas } from "../mumbai-localities.js";
 
 const router = Router();
 
@@ -87,7 +83,13 @@ router.get("/status/:sessionId", (req, res) => {
       baileysConnector.removeListener(`logged_out:${sessionId}`, onLoggedOut);
       baileysConnector.removeListener(`reconnecting:${sessionId}`, onReconnecting);
       baileysConnector.removeListener(`message.ack:${sessionId}`, onAck);
-      baileysConnector.cleanup(sessionId).catch(() => {});
+      // Closing the setup tab must NOT unlink the WhatsApp device.
+      // A connected session stays alive; only a session that never
+      // paired (QR never scanned) is abandoned, without logout.
+      const current = baileysConnector.getSession(sessionId);
+      if (current && !current.connected) {
+        baileysConnector.disconnect(sessionId).catch(() => {});
+      }
     });
 
     return;
@@ -108,69 +110,26 @@ async function processGroups(sessionId, groups) {
 
   const { email } = pending;
 
-  const matched = [];
-
-  for (const group of groups) {
-    const areas = getGroupAreas(group.subject);
-    if (areas.length === 0) continue;
-
-    const groupContactMap = new Map();
-
-    for (const p of group.participants) {
-      if (!p.phone) continue;
-      const key = p.phone;
-      if (!groupContactMap.has(key)) {
-        groupContactMap.set(key, {
-          phone: `+91${p.phone}`,
-          name: p.name || p.phone,
-          areas: areas.map((a) => a.area),
-          groups: [group.subject],
-        });
-      }
-    }
-
-    for (const contact of groupContactMap.values()) {
-      matched.push(contact);
-    }
-  }
-
-  // deduplicate across groups (merge areas and source groups)
-  const merged = new Map();
-  for (const c of matched) {
-    const key = c.phone;
-    if (merged.has(key)) {
-      const existing = merged.get(key);
-      existing.areas = [...new Set([...existing.areas, ...c.areas])];
-      existing.groups = [...new Set([...existing.groups, ...c.groups])];
-    } else {
-      merged.set(key, { ...c, areas: [...c.areas], groups: [...c.groups] });
-    }
-  }
-
-  const dedupedContacts = Array.from(merged.values());
-
-  // upsert into global broker_contacts
-  upsertBrokerContacts(dedupedContacts);
-
-  // get or create user workspace
-  let user = createUser(email, email.split("@")[0]);
+  // Group-participant harvesting is disabled: members of the user's
+  // groups are never imported into contacts. Recipients enter WaBro
+  // only as explicit, user-approved lists. The fetched groups are still
+  // surfaced to the UI (count) but their participants are not read.
+  const user = createUser(email, email.split("@")[0]);
   const workspace = getOrCreateWorkspace(user.id);
-
-  // regenerate broadcast lists for this workspace from global graph
-  const lists = generateBroadcastLists(workspace.id, user.id);
+  const lists = getBroadcastLists(workspace.id);
   const stats = getStats(workspace.id);
-
-  const areaCount = lists.length;
 
   pendingSessions.set(sessionId, {
     ...pending,
     completed: true,
     contactCount: stats.total_contacts,
-    areaCount,
+    areaCount: lists.length,
     lists,
   });
 
-  baileysConnector.cleanup(sessionId).catch(() => {});
+  // The session intentionally stays connected: onboarding no longer
+  // unlinks the device. Disconnect/logout happens only through the
+  // explicit logout endpoint below.
 }
 
 // GET /api/wabro/onboard/results/:sessionId
@@ -213,6 +172,21 @@ router.get("/contacts", (req, res) => {
   const lists = getBroadcastLists(workspaceId);
 
   res.json({ lists });
+});
+
+// POST /api/wabro/onboard/logout - explicit, user-initiated unlink.
+// This is the ONLY code path that logs the device out of WhatsApp.
+router.post("/logout", async (req, res) => {
+  const { sessionId } = req.body;
+  if (!sessionId) return res.status(400).json({ error: "sessionId is required" });
+
+  const session = baileysConnector.getSession(sessionId);
+  if (!session) return res.status(404).json({ error: "Session not found" });
+
+  await baileysConnector.logout(sessionId);
+  pendingSessions.delete(sessionId);
+
+  res.json({ success: true });
 });
 
 export default router;
