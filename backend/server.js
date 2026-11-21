@@ -1,6 +1,7 @@
 import express from "express";
 import cors from "cors";
 import { join, dirname } from "node:path";
+import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import onboardRouter from "./routes/onboard.js";
 import messagesRouter from "./routes/messages.js";
@@ -16,7 +17,11 @@ import { createRequire } from "node:module";
 const _require = createRequire(import.meta.url);
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const WEB_DIR = join(__dirname, "..", "web");
+// Panel assets live inside the deployable unit: ./web in the container image
+// (backend build context), ../web only in a full repo checkout (local dev).
+const WEB_DIR = [join(__dirname, "web"), join(__dirname, "..", "web")].find((p) =>
+  existsSync(p)
+);
 const app = express();
 const PORT = process.env.PORT || 3002;
 
