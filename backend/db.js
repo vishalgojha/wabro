@@ -109,7 +109,33 @@ db.exec(`
   );
 
   CREATE INDEX IF NOT EXISTS idx_send_log_phone_hash ON outreach_send_log(phone, text_hash, sent_at);
+
+  -- Opt-out signals we could not map to a phone (e.g. lid-addressed DMs the
+  -- library cannot resolve). Recorded so the uncertainty is visible instead
+  -- of silently pretending every opt-out was honored. Only the chat id and
+  -- the matched keyword are stored - never message content.
+  CREATE TABLE IF NOT EXISTS unresolved_optout_signals (
+    chat_id TEXT NOT NULL,
+    keyword TEXT NOT NULL,
+    received_at TEXT DEFAULT (datetime('now')),
+    PRIMARY KEY (chat_id, keyword)
+  );
 `);
+
+export function recordUnresolvedOptOut(chatId, keyword) {
+  db.prepare(`
+    INSERT INTO unresolved_optout_signals (chat_id, keyword)
+    VALUES (?, ?)
+    ON CONFLICT(chat_id, keyword) DO UPDATE SET received_at = datetime('now')
+  `).run(chatId, keyword);
+}
+
+export function getUnresolvedOptOuts() {
+  return db.prepare(`
+    SELECT chat_id AS chatId, keyword, received_at AS receivedAt
+    FROM unresolved_optout_signals ORDER BY received_at DESC
+  `).all();
+}
 
 export function upsertBrokerContacts(contacts) {
   const insert = db.prepare(`
@@ -178,9 +204,13 @@ export function getBrokerContacts(opts = {}) {
 }
 
 export function optOutBroker(phone) {
+  // Upsert: an opt-out must be recorded even when the phone was never a
+  // broker contact (e.g. a one-off outreach recipient), or the dedup /
+  // preview guard could not honor it later.
   db.prepare(`
-    UPDATE broker_contacts SET opted_out = 1, opted_out_at = datetime('now')
-    WHERE phone = ?
+    INSERT INTO broker_contacts (phone, opted_out, opted_out_at)
+    VALUES (?, 1, datetime('now'))
+    ON CONFLICT(phone) DO UPDATE SET opted_out = 1, opted_out_at = datetime('now')
   `).run(phone);
 
   db.prepare(`

@@ -3,6 +3,7 @@ const state = {
   campaigns: [],
   contactLists: [],
   contactsByList: new Map(),
+  session: null,
   serviceState: "checking"
 };
 
@@ -105,30 +106,28 @@ function renderStats() {
   const template = document.getElementById("stat-card-template");
   if (!statsRoot || !template) return;
 
-  const stats = state.stats || {
-    total_campaigns: 0,
-    total_sent: 0,
-    total_failed: 0,
-    total_skipped: 0,
-    total_lists: 0,
-    total_contacts: 0
-  };
+  const stats = state.stats || {};
 
+  // Only render real numbers. Metrics the backend does not track yet are
+  // shown as unavailable, never as a misleading zero or a blank card.
+  const UNAVAILABLE = "\u2014"; // em dash placeholder for untracked metrics
   const cards = [
-    ["Campaigns", stats.total_campaigns, "Campaigns in this workspace"],
-    ["Sent", stats.total_sent, "Messages marked sent"],
-    ["Failed", stats.total_failed, "Failed delivery attempts"],
-    ["Skipped", stats.total_skipped, "Contacts skipped in sync logs"],
+    ["Campaigns", stats.total_campaigns, "Batch history view coming to the panel"],
+    ["Sent", stats.total_sent, "Per-recipient status lives in the batch API"],
+    ["Failed", stats.total_failed, "Per-recipient status lives in the batch API"],
+    ["Skipped", stats.total_skipped, "Per-recipient status lives in the batch API"],
     ["Contacts", stats.total_contacts, "Contacts in broadcast lists"],
     ["Broker Lists", state.contactLists.length, "Saved broadcast lists"]
   ];
 
   statsRoot.innerHTML = "";
   cards.forEach(([label, value, note]) => {
+    const available = typeof value === "number";
     const node = template.content.firstElementChild.cloneNode(true);
     node.querySelector(".stat-label").textContent = label;
-    node.querySelector(".stat-value").textContent = value;
-    node.querySelector(".stat-note").textContent = note;
+    node.querySelector(".stat-value").textContent = available ? value : UNAVAILABLE;
+    node.querySelector(".stat-note").textContent = available ? note : `Not available yet. ${note}`;
+    if (!available) node.classList.add("stat-unavailable");
     statsRoot.appendChild(node);
   });
 }
@@ -142,7 +141,7 @@ function renderOverviewLists() {
   waRoot.innerHTML = "";
 
   if (!state.campaigns.length) {
-    campaignRoot.appendChild(emptyState("No campaigns yet", "Create a campaign from one of your saved broker lists."));
+    campaignRoot.appendChild(emptyState("No campaigns yet", "Campaign creation from the panel is not available yet. Outreach runs as approval-bound batches."));
   } else {
     state.campaigns.slice(0, 8).forEach((campaign) => {
       const done = Number(campaign.sent_count || 0) + Number(campaign.failed_count || 0) + Number(campaign.skipped_count || 0);
@@ -155,12 +154,8 @@ function renderOverviewLists() {
     });
   }
 
-  waRoot.appendChild(entityCard({
-    title: "WhatsApp link",
-    meta: "Status",
-    body: "Connect your WhatsApp from the setup page to enable campaign delivery.",
-    tag: "Web"
-  }));
+  const wa = describeSession();
+  waRoot.appendChild(entityCard({ title: wa.title, meta: wa.meta, body: wa.body, tag: "Web" }));
 }
 
 function renderBrokerLists() {
@@ -169,7 +164,7 @@ function renderBrokerLists() {
   root.innerHTML = "";
 
   if (!state.contactLists.length) {
-    root.appendChild(emptyState("No broker lists yet", "Import a broker list or add a broker manually into a named list."));
+    root.appendChild(emptyState("No broker lists yet", "Panel import is not wired up yet. Reusable lists are not available yet. Send batches take per-batch recipients through the approved flow."));
     return;
   }
 
@@ -201,7 +196,7 @@ function renderCampaigns() {
   root.innerHTML = "";
 
   if (!state.campaigns.length) {
-    root.appendChild(emptyState("No campaigns created", "Create a campaign from one of your imported broker lists."));
+    root.appendChild(emptyState("No campaigns created", "Campaign creation from the panel is not available yet. Outreach runs as approval-bound batches."));
     return;
   }
 
@@ -221,12 +216,17 @@ function renderConnection() {
   if (!root) return;
   root.innerHTML = "";
 
-  root.appendChild(emptyState("WhatsApp not linked", "Scan a QR code from the setup page to link your WhatsApp and start sending."));
+  const wa = describeSession();
+  if (!state.session || !state.session.connected) {
+    root.appendChild(emptyState(wa.title, wa.body));
+  }
 
   const card = entityCard({
-    title: "Link your WhatsApp",
-    meta: "One-time QR scan",
-    body: "Open the setup page, scan the QR code with WhatsApp, and your account becomes the delivery channel.",
+    title: wa.title,
+    meta: wa.meta,
+    body: state.session && state.session.connected
+      ? "The linked device is the delivery channel for approved batches. Manage the link from the setup page."
+      : "Open the setup page, link with a pairing code (or QR scan), and your account becomes the delivery channel.",
     tag: "Web"
   });
   root.appendChild(card);
@@ -242,18 +242,29 @@ function rerender() {
 }
 
 async function loadDashboard() {
-  const [dashboard, campaigns, lists] = await Promise.all([
-    apiFetch("/wabro/dashboard/stats"),
-    apiFetch("/wabro/campaigns"),
-    apiFetch("/wabro/contacts")
+  const [dashboard, campaigns, lists, session] = await Promise.all([
+    apiFetch("/dashboard/stats"),
+    apiFetch("/campaigns"),
+    apiFetch("/contacts"),
+    apiFetch("/session").catch(() => null)
   ]);
 
   state.stats = dashboard?.stats || null;
   state.campaigns = Array.isArray(campaigns?.campaigns) ? campaigns.campaigns : [];
   state.contactLists = Array.isArray(lists?.lists) ? lists.lists : [];
+  state.session = session;
 
   setServiceState("online");
   rerender();
+}
+
+function describeSession() {
+  const s = state.session;
+  if (!s) return { title: "WhatsApp link", meta: "Status unknown", body: "Could not read the live session state. Open the setup page to check the link." };
+  if (s.connected) return { title: "WhatsApp linked", meta: "Connected", body: "This device is linked and can deliver approved batches." };
+  if (s.state === "stored_offline") return { title: "WhatsApp linked", meta: "Reconnecting", body: "Stored link found, waiting for the connection to come back." };
+  if (s.state === "connecting" || s.state === "reconnecting" || s.state === "pairing_code") return { title: "Link in progress", meta: s.state, body: "Finish linking from the setup page: scan the QR or use a pairing code." };
+  return { title: "WhatsApp not linked", meta: "Not linked", body: "Open the setup page and link with a pairing code or QR scan." };
 }
 
 function showWorkspace() {
@@ -310,7 +321,7 @@ function bindUi() {
     const locality = String(form.get("locality") || "").trim();
     if (!listName || !name || !phone) return;
 
-    await apiFetch("/wabro/contacts", {
+    await apiFetch("/contacts", {
       method: "POST",
       body: JSON.stringify({
         list_name: listName,
@@ -345,7 +356,7 @@ function bindUi() {
       return;
     }
 
-    await apiFetch("/wabro/contacts", {
+    await apiFetch("/contacts", {
       method: "POST",
       body: JSON.stringify({
         list_name: listName,
@@ -369,12 +380,12 @@ function bindUi() {
 
     let contacts = state.contactsByList.get(listName);
     if (!contacts) {
-      const data = await apiFetch(`/wabro/contacts/${encodeURIComponent(listName)}`);
+      const data = await apiFetch(`/contacts/${encodeURIComponent(listName)}`);
       contacts = Array.isArray(data?.contacts) ? data.contacts : [];
       state.contactsByList.set(listName, contacts);
     }
 
-    await apiFetch("/wabro/campaigns", {
+    await apiFetch("/campaigns", {
       method: "POST",
       body: JSON.stringify({
         name,

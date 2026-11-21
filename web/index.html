@@ -62,7 +62,7 @@
                             <p class="eyebrow">WaBro Dashboard</p>
                             <h2>Open the campaign dashboard</h2>
                             <p class="auth-copy">
-                                No account needed. Anyone with access can manage broker lists, campaigns, and WhatsApp connection status.
+                                Protected by a password. Signed-in users can manage broker lists and WhatsApp connection status.
                             </p>
                             <button class="primary-btn" id="open-workspace-btn" type="button">Open Workspace</button>
                         </div>
@@ -76,8 +76,8 @@
                         <p class="eyebrow">What WaBro Does</p>
                         <h2>Built for outbound campaigns, not general WhatsApp operations</h2>
                         <p>
-                            WaBro is the broadcast product surface. It does not handle QR pairing, chat parsing, inbox work,
-                            or Baileys-style connection flows. Its job is campaign delivery.
+                            WaBro is the broadcast product surface. Linking (QR or pairing code) happens on the setup page;
+                            it does not do chat parsing or inbox work. Its job is approved outreach delivery.
                         </p>
                     </div>
 
@@ -112,12 +112,12 @@
                         <article class="step-card">
                             <span class="step-number">1</span>
                             <h3>Connect WhatsApp</h3>
-                            <p>Scan a QR code from the browser to link your WhatsApp. No app installation needed.</p>
+                            <p>Scan a QR code or enter a pairing code from the browser to link your WhatsApp. No app installation needed.</p>
                         </article>
                         <article class="step-card">
                             <span class="step-number">2</span>
                             <h3>Manage from the web</h3>
-                            <p>Use the dashboard directly — no sign-in needed. Manage broker lists and create campaigns.</p>
+                            <p>Use the dashboard with the site password. Manage broker lists and your WhatsApp connection.</p>
                         </article>
                         <article class="step-card">
                             <span class="step-number">3</span>
@@ -211,17 +211,18 @@
                         </div>
 
                         <form class="inline-form hidden" id="broker-form">
-                            <input type="text" name="list_name" placeholder="List name" required />
-                            <input type="text" name="name" placeholder="Broker name" />
-                            <input type="text" name="phone" placeholder="Phone / WhatsApp" />
-                            <input type="text" name="locality" placeholder="Locality" />
-                            <button type="submit" class="primary-btn">Save broker</button>
+                            <p class="form-note">Adding or importing contacts from the panel is not wired up yet. Reusable lists are not available yet. Send batches take per-batch recipients through the approved flow.</p>
+                            <input type="text" name="list_name" placeholder="List name" required disabled />
+                            <input type="text" name="name" placeholder="Broker name" disabled />
+                            <input type="text" name="phone" placeholder="Phone / WhatsApp" disabled />
+                            <input type="text" name="locality" placeholder="Locality" disabled />
+                            <button type="submit" class="primary-btn" disabled>Save broker</button>
                             <div class="import-block">
                                 <p class="eyebrow">Upload broker list</p>
-                                <input type="file" id="broker-file" accept=".csv,.txt" />
-                                <textarea id="broker-bulk-input" rows="5" placeholder="Paste one broker per line:&#10;Rohan Mehta,+919819000111,Andheri West&#10;Aarti Shah,+919819000222,Thane"></textarea>
+                                <input type="file" id="broker-file" accept=".csv,.txt" disabled />
+                                <textarea id="broker-bulk-input" rows="5" placeholder="Paste one broker per line:&#10;Rohan Mehta,+919819000111,Andheri West&#10;Aarti Shah,+919819000222,Thane" disabled></textarea>
                                 <div class="import-actions">
-                                    <button type="button" class="secondary-btn" id="broker-import-btn">Import List</button>
+                                    <button type="button" class="secondary-btn" id="broker-import-btn" disabled>Import List</button>
                                     <span class="import-note">Format: <code>name, phone, locality</code></span>
                                 </div>
                                 <span class="import-status" id="broker-import-status"></span>
@@ -241,10 +242,11 @@
                         </div>
 
                         <form class="inline-form hidden campaign-form" id="campaign-form">
-                            <input type="text" name="name" placeholder="Campaign name" required />
-                            <select name="listName" required id="campaign-contact-list-select"></select>
-                            <textarea name="message_template" placeholder="Campaign message" rows="4" required></textarea>
-                            <button type="submit" class="primary-btn">Create Campaign</button>
+                            <p class="form-note">Creating campaigns from the panel is not wired up yet. Outreach runs as approval-bound batches for now, so nothing can be sent from this form.</p>
+                            <input type="text" name="name" placeholder="Campaign name" required disabled />
+                            <select name="listName" required id="campaign-contact-list-select" disabled></select>
+                            <textarea name="message_template" placeholder="Campaign message" rows="4" required disabled></textarea>
+                            <button type="submit" class="primary-btn" disabled>Create Campaign</button>
                         </form>
 
                         <div id="campaign-list" class="entity-grid"></div>

@@ -14,6 +14,8 @@ import {
   getOrCreateWorkspace,
   getBroadcastLists,
   getBroadcastListContacts,
+  optOutBroker,
+  recordUnresolvedOptOut,
 } from "./db.js";
 import { createRequire } from "node:module";
 
@@ -71,6 +73,40 @@ if (reconciled.batchesParked || reconciled.recipientsParked) {
     `Outreach reconciliation: parked ${reconciled.batchesParked} batch(es), ${reconciled.recipientsParked} in-flight recipient(s) marked uncertain`
   );
 }
+
+// Inbound opt-out keywords: record ONLY. We never auto-reply on this number
+// (a bot reply from a personal WhatsApp is worse than silence), and we never
+// touch group chats. Exact keywords only - "please stop sending" is a human
+// message a human should see, not a keyword to swallow.
+const OPT_OUT_RE = /^(stop|unsubscribe|opt[ -]?out)$/i;
+baileysConnector.on(`message:${DEFAULT_SESSION_ID}`, async (msg) => {
+  if (!msg || msg.fromMe) return;
+  const chatId = typeof msg.chatId === "string" ? msg.chatId : "";
+  const body = (msg.body || "").trim();
+  if (!OPT_OUT_RE.test(body)) return;
+
+  let phone = null;
+  if (chatId.endsWith("@s.whatsapp.net")) {
+    // Strip any device suffix: "9198...:23@s.whatsapp.net" -> "9198...".
+    const user = chatId.split("@")[0].split(":")[0];
+    phone = /^\d+$/.test(user) ? user : null;
+  } else if (chatId.endsWith("@lid")) {
+    // Newer lid addressing: resolve through the library's lid->PN mapping.
+    phone = await baileysConnector.resolvePhoneFromLid(DEFAULT_SESSION_ID, chatId);
+  } else {
+    return; // groups, broadcasts, newsletters: not DMs
+  }
+
+  if (!phone) {
+    // Identity unresolved: record the signal so the uncertainty is visible
+    // (preview surfaces it) instead of silently claiming all opt-outs honored.
+    recordUnresolvedOptOut(chatId, body.toLowerCase());
+    console.warn(`Opt-out keyword from unresolvable chat id ${chatId} - recorded as unresolved`);
+    return;
+  }
+  optOutBroker(phone);
+  console.log(`Opt-out recorded for ${phone} (keyword: ${body.toLowerCase()})`);
+});
 
 // Boot restore: a previously linked device comes back online without a new
 // QR scan. Only the stable default session is restored.

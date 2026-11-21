@@ -344,6 +344,24 @@ class BaileysConnector extends EventEmitter {
     return this.sessions.get(sessionId) || null;
   }
 
+  // Resolve a lid-addressed DM (newer WhatsApp addressing) to a phone number
+  // through the library's own lid->PN mapping. Returns null when the mapping
+  // is unavailable or unknown: callers must treat that as unresolved, never
+  // as "no opt-out".
+  async resolvePhoneFromLid(sessionId, lidChatId) {
+    const session = this.sessions.get(sessionId);
+    const lidUser = String(lidChatId).split("@")[0].split(":")[0];
+    try {
+      const mapping = session?.sock?.signalRepository?.lidMapping;
+      if (!mapping || typeof mapping.getPNForLID !== "function") return null;
+      const pn = await mapping.getPNForLID(lidUser);
+      const num = typeof pn === "string" ? pn.split("@")[0].split(":")[0] : null;
+      return num && /^\d+$/.test(num) ? num : null;
+    } catch {
+      return null;
+    }
+  }
+
   // Request a pairing code on an existing, still-unpaired session.
   // A previous (possibly expired) code is overwritten: an explicit
   // re-request is how an expired code is recovered.

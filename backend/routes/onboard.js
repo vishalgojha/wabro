@@ -1,4 +1,5 @@
 import { Router } from "express";
+import QRCode from "qrcode";
 import { baileysConnector, DEFAULT_SESSION_ID } from "../baileys.js";
 import {
   getStats,
@@ -168,6 +169,23 @@ router.get("/status/:sessionId", (req, res) => {
     pairingCodeIssuedAt: session.pairingCodeIssuedAt,
     groupCount: session.groups?.length || 0,
   });
+});
+
+// GET /api/wabro/onboard/qr-image/:sessionId
+// Render the QR locally. The linking payload must never be sent to a
+// third-party image service (the previous client shipped it to
+// chart.googleapis.com, which is also deprecated).
+router.get("/qr-image/:sessionId", async (req, res) => {
+  const session = baileysConnector.getSession(req.params.sessionId);
+  if (!session || !session.qr) {
+    return res.status(404).json({ error: "No QR available for this session" });
+  }
+  try {
+    const dataUrl = await QRCode.toDataURL(session.qr, { margin: 1, width: 256 });
+    res.json({ dataUrl });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to render QR" });
+  }
 });
 
 async function processGroups(sessionId, groups) {

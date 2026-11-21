@@ -630,3 +630,31 @@ code {
         white-space: nowrap;
     }
 }
+
+/* Unavailable panel states: honest, dimmed, clearly not interactive */
+.stat-unavailable .stat-value {
+  opacity: 0.45;
+}
+
+.stat-unavailable .stat-note {
+  opacity: 0.75;
+}
+
+.form-note {
+  margin: 0 0 0.75rem;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: #e8b45a;
+}
+
+.inline-form input:disabled,
+.inline-form textarea:disabled,
+.inline-form select:disabled,
+.inline-form button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.inline-form {
+  align-items: flex-start;
+}

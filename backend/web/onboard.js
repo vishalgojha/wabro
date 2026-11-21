@@ -21,18 +21,24 @@ function showStep(id) {
   $(id).classList.remove("hidden");
 }
 
-function renderQR(qrText) {
+// Rendered by our own backend (GET /qr-image): the linking payload never
+// leaves this server for a third-party image service.
+async function renderQR() {
   const canvas = $("qr-canvas");
   const placeholder = $("qr-placeholder");
-  canvas.style.display = "block";
-  placeholder.style.display = "none";
-
-  const qr = new URLSearchParams();
-  qr.set("cht", "qr");
-  qr.set("chs", "256x256");
-  qr.set("chl", qrText);
-  qr.set("choe", "UTF-8");
-  canvas.innerHTML = `<img src="https://chart.googleapis.com/chart?${qr.toString()}" alt="QR Code" width="256" height="256" />`;
+  if (!sessionId) return;
+  try {
+    const resp = await fetch(`${API_BASE}/qr-image/${sessionId}`);
+    if (!resp.ok) throw new Error("no qr");
+    const { dataUrl } = await resp.json();
+    canvas.innerHTML = `<img src="${dataUrl}" alt="QR Code" width="256" height="256" />`;
+    canvas.style.display = "block";
+    placeholder.style.display = "none";
+  } catch {
+    canvas.style.display = "none";
+    placeholder.style.display = "block";
+    placeholder.textContent = "QR not ready yet - or use a pairing code below.";
+  }
 }
 
 function showError(msg) {
@@ -151,9 +157,8 @@ function startSSE(sid) {
   const url = `${API_BASE}/status/${sid}?events=1`;
   eventSource = new EventSource(url);
 
-  eventSource.addEventListener("qr", (e) => {
-    const data = JSON.parse(e.data);
-    renderQR(data.qr);
+  eventSource.addEventListener("qr", () => {
+    renderQR();
     $("qr-status").textContent = "QR ready — scan with WhatsApp";
   });
 
@@ -169,6 +174,11 @@ function startSSE(sid) {
     const data = JSON.parse(e.data);
     if (data.pairingCode) {
       renderPairingCode(data.pairingCode, data.pairingCodeIssuedAt);
+    } else if (data.qr) {
+      // Page reloaded while a QR was already waiting: render it instead of
+      // sitting on the "Generating QR code..." placeholder until the next
+      // QR refresh event.
+      renderQR();
     }
   });
 

@@ -22,6 +22,7 @@ import {
   findRecentSend,
   isOptedOut,
   batchCounts,
+  getUnresolvedOptOuts,
 } from "../db.js";
 
 const router = Router();
@@ -84,7 +85,10 @@ router.post("/preview", (req, res) => {
   }
   const window = Number(dedupWindowDays) > 0 ? Number(dedupWindowDays) : DEFAULT_DEDUP_WINDOW_DAYS;
   const textHash = sha256(text);
-  res.json({ textHash, recipients: computeDispositions(textHash, recipients, window) });
+  // Surface opt-out signals we could not map to a phone: the caller must see
+  // that honoring opt-outs is uncertain for these senders, not assume it.
+  const unresolvedOptOuts = getUnresolvedOptOuts();
+  res.json({ textHash, recipients: computeDispositions(textHash, recipients, window), unresolvedOptOuts });
 });
 
 // POST /batches - create an approval-bound batch and start sending it.

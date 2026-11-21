@@ -198,5 +198,24 @@ const post = (path, body) =>
   assert.deepEqual(startCalls.at(-1).opts, { pairingPhone: "919820056180" });
 }
 
+// 13. QR image is rendered locally by the backend, never via third party -----
+{
+  const r404 = await fetch(`${BASE}/api/wabro/onboard/qr-image/default`);
+  assert.equal(r404.status, 404, "no QR on the session -> 404");
+
+  fakeSession.qr = "2@fake-qr-payload-for-render-test";
+  const r = await fetch(`${BASE}/api/wabro/onboard/qr-image/default`);
+  assert.equal(r.status, 200);
+  const body = await r.json();
+  assert.ok(
+    body.dataUrl && body.dataUrl.startsWith("data:image/png;base64,"),
+    "QR renders as a local PNG data URL"
+  );
+  fakeSession.qr = null;
+
+  const rUnknown = await fetch(`${BASE}/api/wabro/onboard/qr-image/nope`);
+  assert.equal(rUnknown.status, 404, "unknown session -> 404");
+}
+
 console.log("pairing-code tests: ALL PASSING");
 process.exit(0);

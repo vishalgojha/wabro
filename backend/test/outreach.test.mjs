@@ -16,6 +16,7 @@ const BASE = "http://127.0.0.1:3992";
 const { baileysConnector } = await import("../baileys.js");
 const {
   optOutBroker,
+  isOptedOut,
   upsertBrokerContacts,
   reconcileOutreachState,
   setBatchStatus,
@@ -389,6 +390,101 @@ const approval = approvalFor("b-1");
   const s = await get("/api/wabro/session");
   assert.equal(s.sessionId, "default");
   assert.equal(s.connected, true);
+}
+
+// 16. inbound STOP keywords: record opt-out only, never reply ----------------
+{
+  const sendsBefore = sentCalls.length;
+
+  // Exact keyword from a DM records the opt-out, even for a phone that was
+  // never a broker contact (upsert path).
+  baileysConnector.emit("message:default", {
+    chatId: "919999900001@s.whatsapp.net",
+    body: "STOP",
+    fromMe: false,
+  });
+  assert.equal(isOptedOut("919999900001"), true, "STOP must opt the sender out");
+
+  baileysConnector.emit("message:default", {
+    chatId: "919999900002@s.whatsapp.net",
+    body: "  Unsubscribe ",
+    fromMe: false,
+  });
+  assert.equal(isOptedOut("919999900002"), true, "Unsubscribe (any case/space) must opt out");
+
+  // Our own outbound text never triggers it.
+  baileysConnector.emit("message:default", {
+    chatId: "919999900003@s.whatsapp.net",
+    body: "stop",
+    fromMe: true,
+  });
+  assert.equal(isOptedOut("919999900003"), false, "fromMe must be ignored");
+
+  // Group chats are ignored.
+  baileysConnector.emit("message:default", {
+    chatId: "120363000000000000@g.us",
+    body: "stop",
+    fromMe: false,
+  });
+  assert.equal(isOptedOut("120363000000000000"), false, "group messages must be ignored");
+
+  // Free-form human messages are not keywords.
+  baileysConnector.emit("message:default", {
+    chatId: "919999900004@s.whatsapp.net",
+    body: "please stop sending me these",
+    fromMe: false,
+  });
+  assert.equal(isOptedOut("919999900004"), false, "free-form text must not be swallowed");
+
+  assert.equal(sentCalls.length, sendsBefore, "opt-out handling must never reply");
+}
+
+// 17. opt-out identity normalization: device suffixes, lid addressing --------
+{
+  const sendsBefore = sentCalls.length;
+  const tick = () => new Promise((r) => setTimeout(r, 60));
+
+  // Device-suffixed phone JID normalizes to the bare phone.
+  baileysConnector.emit("message:default", {
+    chatId: "919999900005:23@s.whatsapp.net",
+    body: "stop",
+    fromMe: false,
+  });
+  await tick();
+  assert.equal(isOptedOut("919999900005"), true, "device suffix must be stripped");
+
+  // Resolvable lid maps through the library's lid->PN mapping.
+  baileysConnector.resolvePhoneFromLid = async () => "919999900006";
+  baileysConnector.emit("message:default", {
+    chatId: "100000000000001@lid",
+    body: "STOP",
+    fromMe: false,
+  });
+  await tick();
+  assert.equal(isOptedOut("919999900006"), true, "lid must resolve to its phone");
+
+  // Unresolvable lid: no fake opt-out, but the signal is recorded and the
+  // preview surfaces it as uncertainty.
+  baileysConnector.resolvePhoneFromLid = async () => null;
+  baileysConnector.emit("message:default", {
+    chatId: "100000000000002@lid",
+    body: "unsubscribe",
+    fromMe: false,
+  });
+  await tick();
+  assert.equal(isOptedOut("100000000000002"), false, "unresolved lid must not fake an opt-out");
+  const p = await post("/api/wabro/outreach/preview", {
+    text: "identity check",
+    recipients: [{ phone: "+91 90000 00003" }],
+  });
+  const body = await p.json();
+  assert.ok(Array.isArray(body.unresolvedOptOuts), "preview must surface unresolved signals");
+  assert.ok(
+    body.unresolvedOptOuts.some((s) => s.chatId === "100000000000002@lid"),
+    "unresolved lid signal must be recorded"
+  );
+
+  assert.equal(sentCalls.length, sendsBefore, "identity handling must never reply either");
 }
 
 console.log("outreach batch tests: ALL PASSING");
