@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -32,6 +33,7 @@ import (
 type session struct {
 	mu             sync.Mutex
 	client         *whatsmeow.Client
+	readyFn        func() bool // websocket readiness; client.IsConnected in production
 	state          string // connecting|qr|pairing_code|connected|disconnected|logged_out
 	qr             string
 	pairingCode    string
@@ -212,7 +214,7 @@ func (s *server) startSession(sessionID string) (*session, error) {
 	}
 	client := whatsmeow.NewClient(device, waLog.Noop)
 
-	sess := &session{client: client, state: "connecting"}
+	sess := &session{client: client, state: "connecting", readyFn: client.IsConnected}
 	client.AddEventHandler(s.handleEvents(sessionID, sess))
 
 	// QR codes only flow through a channel grabbed before Connect, and only
@@ -253,9 +255,26 @@ func (s *server) startSession(sessionID string) (*session, error) {
 	return sess, nil
 }
 
+// waitReady blocks until the websocket is actually up (IsConnected is
+// true once the handshake completes, which precedes pairing) or the bound
+// expires. This replaces any caller-side fixed sleep: a PairPhone issued
+// before the socket is ready is what produced "Connection Closed".
+func (s *server) waitReady(sess *session, bound time.Duration) error {
+	deadline := time.Now().Add(bound)
+	for {
+		if sess.readyFn() {
+			return nil
+		}
+		if time.Now().After(deadline) {
+			return fmt.Errorf("Connection Closed: socket not ready after %s", bound)
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+}
+
 func (s *server) pairCode(sess *session, phone string) (string, error) {
-	if !sess.client.IsConnected() {
-		return "", fmt.Errorf("Connection Closed")
+	if err := s.waitReady(sess, 10*time.Second); err != nil {
+		return "", err
 	}
 	code, err := sess.client.PairPhone(context.Background(), phone, true, whatsmeow.PairClientChrome, "Chrome (Linux)")
 	if err != nil {
@@ -531,6 +550,18 @@ func (s *server) routes() *http.ServeMux {
 }
 
 
+func isLoopbackAddr(addr string) bool {
+	host, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		return false
+	}
+	if host == "localhost" {
+		return true
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
+}
+
 func parseJID(s string) (types.JID, error) {
 	return types.ParseJID(s)
 }
@@ -562,7 +593,7 @@ func main() {
 	}
 	dataDir := os.Getenv("CONNECTOR_DATA_DIR")
 	if dataDir == "" {
-		dataDir = "/data/connector"
+		dataDir = "data/connector"
 	}
 	backend := os.Getenv("BACKEND_URL")
 	if backend == "" {
@@ -578,6 +609,9 @@ func main() {
 	addr := os.Getenv("CONNECTOR_ADDR")
 	if addr == "" {
 		addr = "127.0.0.1:4100"
+	}
+	if !isLoopbackAddr(addr) {
+		log.Fatal("CONNECTOR_ADDR must bind a loopback address; the connector is never exposed off-host")
 	}
 	log.Printf("[connector] listening on %s", addr)
 	log.Fatal(http.ListenAndServe(addr, s.routes()))

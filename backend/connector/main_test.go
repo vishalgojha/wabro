@@ -221,3 +221,72 @@ func TestReceiptAckStatusMapping(t *testing.T) {
 		t.Fatalf("delivered status = %v, want 3", e["status"])
 	}
 }
+
+// Readiness gating for PairPhone: mocked readyFn, no code minted. A
+// socket that comes up within the bound passes; one that never comes up
+// fails with a bounded, honest error instead of "Connection Closed"
+// surfacing from a premature PairPhone.
+func TestWaitReadySucceedsWhenSocketComesUp(t *testing.T) {
+	s := &server{}
+	calls := 0
+	sess := &session{readyFn: func() bool {
+		calls++
+		return calls >= 3
+	}}
+	if err := s.waitReady(sess, 2*time.Second); err != nil {
+		t.Fatalf("waitReady failed despite socket coming up: %v", err)
+	}
+}
+
+func TestWaitReadyTimesOutBounded(t *testing.T) {
+	s := &server{}
+	sess := &session{readyFn: func() bool { return false }}
+	start := time.Now()
+	err := s.waitReady(sess, 300*time.Millisecond)
+	if err == nil {
+		t.Fatalf("waitReady succeeded on a socket that never came up")
+	}
+	if elapsed := time.Since(start); elapsed > 2*time.Second {
+		t.Fatalf("waitReady overran its bound: %s", elapsed)
+	}
+}
+
+func TestIsLoopbackAddr(t *testing.T) {
+	for _, ok := range []string{"127.0.0.1:4100", "localhost:4100", "[::1]:4100"} {
+		if !isLoopbackAddr(ok) {
+			t.Fatalf("%s should be accepted as loopback", ok)
+		}
+	}
+	for _, bad := range []string{"0.0.0.0:4100", ":4100", "192.168.1.5:4100", "example.com:4100", "not-an-addr"} {
+		if isLoopbackAddr(bad) {
+			t.Fatalf("%s must be rejected as non-loopback", bad)
+		}
+	}
+}
+
+// A stale socket's events must not mutate or emit for the id that has
+// been taken over by a fresh session object.
+func TestStaleSocketEventsIgnored(t *testing.T) {
+	sink := newEventSink(t)
+	s := newTestServer(sink)
+	stale := newTestSession()
+	stale.state = "pairing_code"
+	stale.pairingCode = "DEAD0000"
+	fresh := newTestSession()
+	fresh.state = "connected"
+	fresh.connected = true
+	register(s, "t", fresh)
+
+	s.handleEvents("t", stale)(&events.Disconnected{})
+
+	if fresh.state != "connected" || !fresh.connected {
+		t.Fatalf("stale event clobbered the live session: %q", fresh.state)
+	}
+	if stale.pairingCode != "DEAD0000" {
+		t.Fatalf("stale session state should be untouched")
+	}
+	time.Sleep(50 * time.Millisecond)
+	if sink.count("disconnected") != 0 {
+		t.Fatalf("stale socket emitted an event")
+	}
+}

@@ -25,6 +25,12 @@ import { fileURLToPath } from "node:url";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const CONNECTOR_ADDR = process.env.CONNECTOR_ADDR || "127.0.0.1:4100";
+// Single resolution for the session store path: the sidecar child env, the
+// boot-restore check and the /api/wabro/session probe all use this value.
+// In the container __dirname is /app, so this lands on the persistent
+// volume mount.
+const CONNECTOR_DATA_DIR =
+  process.env.CONNECTOR_DATA_DIR || join(__dirname, "data", "connector");
 const BASE = `http://${CONNECTOR_ADDR}`;
 const BACKEND_PORT = process.env.PORT || "3002";
 
@@ -44,14 +50,18 @@ class ConnectorClient extends EventEmitter {
   spawnSidecar() {
     if (process.env.CONNECTOR_SPAWN_DISABLED) return; // tests stub the client
     const bin = process.env.CONNECTOR_BIN || join(__dirname, "connector", "wabro-connector");
-    const dataDir = process.env.CONNECTOR_DATA_DIR || join(__dirname, "..", "data", "connector");
     const launch = () => {
       this.child = spawn(bin, [], {
+        // Minimal child environment: the sidecar needs only its token,
+        // bind address, store path and webhook target. Spreading the
+        // backend's whole env would leak unrelated secrets to the child.
         env: {
-          ...process.env,
+          PATH: process.env.PATH,
+          HOME: process.env.HOME,
+          TMPDIR: process.env.TMPDIR,
           CONNECTOR_TOKEN: this.token,
           CONNECTOR_ADDR,
-          CONNECTOR_DATA_DIR: dataDir,
+          CONNECTOR_DATA_DIR,
           BACKEND_URL: `http://127.0.0.1:${BACKEND_PORT}`,
         },
         stdio: ["ignore", "inherit", "inherit"],
@@ -93,13 +103,12 @@ class ConnectorClient extends EventEmitter {
     const data = await this.call("POST", `/sessions/${sessionId}/start`);
     this.ensureCached(sessionId).state = data.state || "connecting";
     if (pairingPhone) {
-      // PairPhone needs the socket up; the sidecar rejects a closed one
-      // and the error surfaces as a session error event, same as before.
-      setTimeout(() => {
-        this.requestPairingCode(sessionId, pairingPhone).catch((err) => {
-          this.emit(`error:${sessionId}`, `Pairing code request failed: ${err.message}`);
-        });
-      }, 1500).unref?.();
+      // The sidecar waits for actual websocket readiness (bounded) inside
+      // the pair-code endpoint, so no arbitrary sleep here. A readiness
+      // timeout surfaces as a session error event, same as before.
+      this.requestPairingCode(sessionId, pairingPhone).catch((err) => {
+        this.emit(`error:${sessionId}`, `Pairing code request failed: ${err.message}`);
+      });
     }
     return sessionId;
   }
@@ -281,6 +290,4 @@ class ConnectorClient extends EventEmitter {
 
 export const baileysConnector = new ConnectorClient();
 export const DEFAULT_SESSION_ID = "default";
-// The whatsmeow store lives under this dir (one sqlite db per session).
-export const CONNECTOR_DATA_DIR =
-  process.env.CONNECTOR_DATA_DIR || join(__dirname, "data", "connector");
+export { CONNECTOR_DATA_DIR };
