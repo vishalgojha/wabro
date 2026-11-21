@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import onboardRouter from "./routes/onboard.js";
 import messagesRouter from "./routes/messages.js";
 import outreachRouter from "./routes/outreach.js";
-import { baileysConnector, AUTH_DIR, DEFAULT_SESSION_ID } from "./baileys.js";
+import { baileysConnector, CONNECTOR_DATA_DIR, DEFAULT_SESSION_ID } from "./connector.js";
 import {
   getStats,
   reconcileOutreachState,
@@ -56,10 +56,10 @@ app.use("/api/wabro/outreach", outreachRouter);
 // Session state for operators: is the linked device connected right now?
 app.get("/api/wabro/session", (req, res) => {
   const session = baileysConnector.getSession(DEFAULT_SESSION_ID);
-  const hasStoredCreds = existsSync(join(AUTH_DIR, DEFAULT_SESSION_ID, "creds.json"));
+  const hasStoredSession = existsSync(join(CONNECTOR_DATA_DIR, DEFAULT_SESSION_ID, "whatsmeow.db"));
   res.json({
     sessionId: DEFAULT_SESSION_ID,
-    state: session ? session.state : hasStoredCreds ? "stored_offline" : "none",
+    state: session ? session.state : hasStoredSession ? "stored_offline" : "none",
     connected: !!(session && session.connected),
   });
 });
@@ -108,9 +108,16 @@ baileysConnector.on(`message:${DEFAULT_SESSION_ID}`, async (msg) => {
   console.log(`Opt-out recorded for ${phone} (keyword: ${body.toLowerCase()})`);
 });
 
+// Internal webhook: the whatsmeow sidecar pushes session events here.
+// Loopback + per-boot token only (enforced in handleWebhook).
+app.post("/internal/connector/event", (req, res) => baileysConnector.handleWebhook(req, res));
+
+// Start the connector sidecar (bounded respawn inside spawnSidecar).
+baileysConnector.spawnSidecar();
+
 // Boot restore: a previously linked device comes back online without a new
-// QR scan. Only the stable default session is restored.
-if (existsSync(join(AUTH_DIR, DEFAULT_SESSION_ID, "creds.json"))) {
+// pairing. Only the stable default session is restored.
+if (existsSync(join(CONNECTOR_DATA_DIR, DEFAULT_SESSION_ID, "whatsmeow.db"))) {
   baileysConnector
     .startSession(DEFAULT_SESSION_ID)
     .catch((err) => console.error("Session restore failed:", err.message));

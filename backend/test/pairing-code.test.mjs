@@ -12,7 +12,8 @@ rmSync(join(__dirname, "..", "data"), { recursive: true, force: true });
 process.env.PORT = "3993";
 const BASE = "http://127.0.0.1:3993";
 
-const { baileysConnector } = await import("../baileys.js");
+process.env.CONNECTOR_SPAWN_DISABLED = "1";
+const { baileysConnector } = await import("../connector.js");
 
 const startCalls = [];
 let pairingRequests = [];

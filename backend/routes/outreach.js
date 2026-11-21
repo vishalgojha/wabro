@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { createHash } from "node:crypto";
-import { baileysConnector, DEFAULT_SESSION_ID } from "../baileys.js";
+import { baileysConnector, DEFAULT_SESSION_ID } from "../connector.js";
 import {
   createOutreachBatch,
   getOutreachBatch,

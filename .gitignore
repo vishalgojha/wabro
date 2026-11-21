@@ -10,3 +10,4 @@ scripts/node_modules/
 backend/auth/
 backend/data/
 backend/node_modules/
+backend/connector/wabro-connector

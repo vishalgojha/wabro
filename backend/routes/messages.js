@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { baileysConnector } from "../baileys.js";
+import { baileysConnector } from "../connector.js";
 
 const router = Router();
 
