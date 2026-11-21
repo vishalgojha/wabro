@@ -41,6 +41,19 @@ async function renderQR() {
   }
 }
 
+function setLinkingStopped() {
+  // The socket is gone, so every artifact that implied progress is a lie:
+  // replace the QR placeholder and loading status with an unambiguous
+  // stopped state. The restart path lives in the pairing section.
+  $("qr-canvas").style.display = "none";
+  const ph = $("qr-placeholder");
+  ph.style.display = "grid";
+  ph.textContent = "Linking stopped";
+  const status = $("qr-status");
+  status.classList.remove("loading");
+  status.textContent = "Linking stopped. Tap Restart linking to try again.";
+}
+
 function showError(msg) {
   $("error-message").textContent = msg;
   showStep("step-error");
@@ -207,6 +220,7 @@ function startSSE(sid) {
   eventSource.addEventListener("disconnected", () => {
     // The socket died before linking finished, so any code it minted died
     // with it. Never leave a dead code on screen as if it were usable.
+    setLinkingStopped();
     $("pairing-code-display").classList.add("hidden");
     showPairingError("Connection was lost before linking finished, so that code is no longer valid. Tap Restart linking for a fresh one.", true);
   });
@@ -245,6 +259,10 @@ async function startSession() {
   if (starting) return;
   starting = true;
 
+  const ph = $("qr-placeholder");
+  ph.style.display = "grid";
+  ph.textContent = "Generating QR code...";
+  $("qr-status").classList.add("loading");
   $("qr-status").textContent = "Starting session...";
   showStep("step-qr");
 
