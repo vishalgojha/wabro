@@ -186,8 +186,8 @@ class ConnectorClient extends EventEmitter {
     throw new Error("Profile name changes are not supported by the connector");
   }
 
-  async setProfileStatus() {
-    throw new Error("Profile status changes are not supported by the connector");
+  async setProfileStatus(sessionId, status) {
+    await this.call("POST", `/sessions/${sessionId}/profile-status`, { status });
   }
 
   // whatsmeow resolves LID identities natively; when the sender arrives as

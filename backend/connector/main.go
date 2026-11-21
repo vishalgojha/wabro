@@ -412,6 +412,30 @@ func (s *server) routes() *http.ServeMux {
 		writeJSON(w, 200, map[string]any{"groups": names, "count": len(names)})
 	})
 
+	mux.HandleFunc("POST /sessions/{id}/profile-status", func(w http.ResponseWriter, r *http.Request) {
+		if !s.auth(r) {
+			writeJSON(w, 401, map[string]string{"error": "unauthorized"})
+			return
+		}
+		sess, ok := s.getSession(r)
+		if !ok || !sess.client.IsConnected() {
+			writeJSON(w, 409, map[string]string{"error": "session not connected"})
+			return
+		}
+		var body struct {
+			Status string `json:"status"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Status == "" {
+			writeJSON(w, 400, map[string]string{"error": "status required"})
+			return
+		}
+		if err := sess.client.SetStatusMessage(r.Context(), types.SetStatusInput{Text: &body.Status}); err != nil {
+			writeJSON(w, 502, map[string]string{"error": err.Error()})
+			return
+		}
+		writeJSON(w, 200, map[string]bool{"ok": true})
+	})
+
 	mux.HandleFunc("POST /sessions/{id}/send-text", func(w http.ResponseWriter, r *http.Request) {
 		if !s.auth(r) {
 			writeJSON(w, 401, map[string]string{"error": "unauthorized"})
