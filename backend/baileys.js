@@ -45,6 +45,7 @@ class BaileysConnector extends EventEmitter {
       state: "connecting",
       qr: null,
       pairingCode: null,
+      pairingCodeIssuedAt: null,
       connected: false,
       groups: [],
       presence: "unavailable",
@@ -59,6 +60,7 @@ class BaileysConnector extends EventEmitter {
         try {
           const code = await sock.requestPairingCode(pairingPhone);
           session.pairingCode = code;
+          session.pairingCodeIssuedAt = Date.now();
           session.state = "pairing_code";
           this.emit(`pairing_code:${sessionId}`, code);
         } catch (err) {
@@ -343,6 +345,8 @@ class BaileysConnector extends EventEmitter {
   }
 
   // Request a pairing code on an existing, still-unpaired session.
+  // A previous (possibly expired) code is overwritten: an explicit
+  // re-request is how an expired code is recovered.
   async requestPairingCode(sessionId, phone) {
     const session = this.sessions.get(sessionId);
     if (!session) throw new Error("Session not found");
@@ -351,6 +355,7 @@ class BaileysConnector extends EventEmitter {
     if (normalized.length < 10) throw new Error("phone with country code is required");
     const code = await session.sock.requestPairingCode(normalized);
     session.pairingCode = code;
+    session.pairingCodeIssuedAt = Date.now();
     session.state = "pairing_code";
     this.emit(`pairing_code:${sessionId}`, code);
     return code;

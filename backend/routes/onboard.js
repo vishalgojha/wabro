@@ -31,8 +31,9 @@ router.post("/start", async (req, res) => {
     const existing = baileysConnector.getSession(sessionId);
     if (existing) {
       // An unpaired session can still switch to code-based linking on the
-      // same socket; a linked session needs nothing at all.
-      if (pairingPhone && !existing.connected && !existing.pairingCode) {
+      // same socket; an explicit re-request overwrites a stale code (that
+      // is how an expired code is recovered). A linked session is untouched.
+      if (pairingPhone && !existing.connected) {
         await baileysConnector.requestPairingCode(sessionId, pairingPhone);
       }
       pendingSessions.set(sessionId, { email, createdAt: Date.now() });
@@ -46,6 +47,47 @@ router.post("/start", async (req, res) => {
     res.json({ sessionId, state: "connecting" });
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/wabro/onboard/pairing-code - request a (fresh) pairing code.
+// This is the expired-code recovery path: it always mints a NEW code.
+// Body: { phone, fresh? } - with fresh:true a confirmed-unpaired socket is
+// recreated first (designed abandon of an unpaired session; a linked device
+// is never touched), used when the current socket can no longer answer.
+router.post("/pairing-code", async (req, res) => {
+  try {
+    const sessionId = DEFAULT_SESSION_ID;
+    const email = req.body.email || DEFAULT_EMAIL;
+    const phone = String(req.body.phone || "").replace(/\D/g, "");
+    if (phone.length < 10) {
+      return res.status(400).json({ error: "phone with country code is required" });
+    }
+
+    const existing = baileysConnector.getSession(sessionId);
+    if (existing?.connected) {
+      return res.status(409).json({ error: "Session already linked" });
+    }
+
+    pendingSessions.set(sessionId, { email, createdAt: Date.now() });
+
+    if (!existing || req.body.fresh === true) {
+      if (existing) await baileysConnector.disconnect(sessionId);
+      await baileysConnector.startSession(sessionId, { pairingPhone: phone });
+      // The code arrives asynchronously on status / SSE, same as /start.
+      return res.json({ sessionId, state: "connecting" });
+    }
+
+    const code = await baileysConnector.requestPairingCode(sessionId, phone);
+    const current = baileysConnector.getSession(sessionId);
+    res.json({
+      sessionId,
+      state: current.state,
+      pairingCode: code,
+      pairingCodeIssuedAt: current.pairingCodeIssuedAt,
+    });
+  } catch (err) {
+    res.status(502).json({ error: `Pairing code request failed: ${err.message}` });
   }
 });
 
@@ -73,10 +115,10 @@ router.get("/status/:sessionId", (req, res) => {
     };
 
     // send current state immediately
-    sendEvent("state", { state: session.state, qr: session.qr, pairingCode: session.pairingCode });
+    sendEvent("state", { state: session.state, qr: session.qr, pairingCode: session.pairingCode, pairingCodeIssuedAt: session.pairingCodeIssuedAt });
 
     const onQR = (qr) => sendEvent("qr", { qr });
-    const onPairingCode = (code) => sendEvent("pairing_code", { code });
+    const onPairingCode = (code) => sendEvent("pairing_code", { code, issuedAt: baileysConnector.getSession(sessionId)?.pairingCodeIssuedAt || null });
     const onConnected = () => sendEvent("connected", {});
     const onGroups = (groups) => {
       sendEvent("groups", { count: groups.length });
@@ -123,6 +165,7 @@ router.get("/status/:sessionId", (req, res) => {
     state: session.state,
     qr: session.pairingCode ? null : session.qr,
     pairingCode: session.pairingCode,
+    pairingCodeIssuedAt: session.pairingCodeIssuedAt,
     groupCount: session.groups?.length || 0,
   });
 });

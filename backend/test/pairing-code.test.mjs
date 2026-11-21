@@ -25,6 +25,7 @@ baileysConnector.startSession = async (sessionId, opts = {}) => {
     state: "connecting",
     qr: null,
     pairingCode: null,
+    pairingCodeIssuedAt: null,
     connected: false,
     groups: [],
   };
@@ -33,6 +34,7 @@ baileysConnector.startSession = async (sessionId, opts = {}) => {
   if (opts.pairingPhone) {
     setTimeout(() => {
       fakeSession.pairingCode = "ABCD1234";
+      fakeSession.pairingCodeIssuedAt = Date.now();
       fakeSession.state = "pairing_code";
       baileysConnector.emit(`pairing_code:${sessionId}`, "ABCD1234");
     }, 50);
@@ -42,6 +44,7 @@ baileysConnector.startSession = async (sessionId, opts = {}) => {
 baileysConnector.requestPairingCode = async (sessionId, phone) => {
   pairingRequests.push({ sessionId, phone });
   fakeSession.pairingCode = "WXYZ9876";
+  fakeSession.pairingCodeIssuedAt = Date.now();
   fakeSession.state = "pairing_code";
   return "WXYZ9876";
 };
@@ -123,6 +126,76 @@ const post = (path, body) =>
   const body = await r.json();
   assert.equal(body.state, "connected");
   assert.equal(pairingRequests.length, before, "no pairing code for a linked session");
+}
+
+// 7. /pairing-code rejects a phone without country code ----------------------
+{
+  const before = pairingRequests.length;
+  const r = await post("/api/wabro/onboard/pairing-code", { phone: "123" });
+  assert.equal(r.status, 400);
+  assert.equal(pairingRequests.length, before, "no request minted for bad phone");
+}
+
+// 8. /pairing-code refuses a linked session ------------------------------------
+{
+  fakeSession.connected = true;
+  fakeSession.state = "connected";
+  const before = pairingRequests.length;
+  const r = await post("/api/wabro/onboard/pairing-code", { phone: "919820056180" });
+  assert.equal(r.status, 409);
+  assert.equal(pairingRequests.length, before, "linked session must stay untouched");
+}
+
+// 9. /pairing-code overwrites a stale code (expired-code recovery) -------------
+{
+  fakeSession.connected = false;
+  fakeSession.state = "pairing_code";
+  fakeSession.pairingCode = "STALE123";
+  fakeSession.pairingCodeIssuedAt = 111;
+  const before = pairingRequests.length;
+  const r = await post("/api/wabro/onboard/pairing-code", { phone: "+91 98200 56180" });
+  assert.equal(r.status, 200);
+  const body = await r.json();
+  assert.equal(body.pairingCode, "WXYZ9876", "fresh code replaces the stale one");
+  assert.ok(body.pairingCodeIssuedAt > 111, "fresh issuedAt is returned");
+  assert.equal(pairingRequests.length, before + 1);
+  assert.equal(pairingRequests.at(-1).phone, "919820056180");
+  const s = await (await fetch(`${BASE}/api/wabro/onboard/status/default`)).json();
+  assert.equal(s.pairingCode, "WXYZ9876");
+  assert.ok(s.pairingCodeIssuedAt > 111, "status exposes the fresh issuedAt");
+}
+
+// 10. /start also reissues when the old code is stale ---------------------------
+{
+  const before = pairingRequests.length;
+  const r = await post("/api/wabro/onboard/start", { pairingPhone: "919820056180" });
+  assert.equal(r.status, 200);
+  assert.equal(pairingRequests.length, before + 1, "stale code must not block reissue");
+}
+
+// 11. /pairing-code {fresh:true} abandons the unpaired socket and recreates -----
+{
+  const callsBefore = startCalls.length;
+  const oldSock = fakeSession.sock;
+  const r = await post("/api/wabro/onboard/pairing-code", { phone: "919820056180", fresh: true });
+  assert.equal(r.status, 200);
+  const body = await r.json();
+  assert.equal(body.state, "connecting");
+  assert.equal(startCalls.length, callsBefore + 1, "session recreated");
+  assert.deepEqual(startCalls.at(-1).opts, { pairingPhone: "919820056180" });
+  assert.equal(oldSock.ws.closed, true, "old unpaired socket abandoned");
+}
+
+// 12. /pairing-code with no session at all starts one with the phone ------------
+{
+  baileysConnector.sessions.delete("default");
+  const callsBefore = startCalls.length;
+  const r = await post("/api/wabro/onboard/pairing-code", { phone: "919820056180" });
+  assert.equal(r.status, 200);
+  const body = await r.json();
+  assert.equal(body.state, "connecting");
+  assert.equal(startCalls.length, callsBefore + 1);
+  assert.deepEqual(startCalls.at(-1).opts, { pairingPhone: "919820056180" });
 }
 
 console.log("pairing-code tests: ALL PASSING");

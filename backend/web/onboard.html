@@ -119,10 +119,91 @@
       margin-top: 16px;
     }
 
+    .link-divider {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      color: var(--muted);
+      font-size: 0.9rem;
+      margin: 24px 0 16px;
+    }
+
+    .link-divider::before,
+    .link-divider::after {
+      content: "";
+      flex: 1;
+      border-top: 1px solid var(--line);
+    }
+
+    .pairing-section .phone-row {
+      display: flex;
+      gap: 10px;
+      margin: 8px 0;
+    }
+
+    .pairing-section input {
+      flex: 1;
+      padding: 12px 14px;
+      border-radius: 14px;
+      border: 1px solid var(--line-strong);
+      background: var(--panel-soft);
+      color: var(--ink);
+      font-size: 1rem;
+      min-width: 0;
+    }
+
+    .pairing-section input:focus {
+      outline: none;
+      border-color: rgba(124, 242, 154, 0.45);
+      box-shadow: 0 0 0 4px rgba(124, 242, 154, 0.08);
+    }
+
+    .pairing-section .primary-btn {
+      width: auto;
+      margin-top: 0;
+      white-space: nowrap;
+    }
+
+    .pairing-code-value {
+      font-size: 2.2rem;
+      font-weight: 700;
+      letter-spacing: 0.35em;
+      text-indent: 0.35em;
+      color: var(--brand);
+      background: var(--panel-soft);
+      border: 1px dashed var(--line-strong);
+      border-radius: 16px;
+      padding: 18px 12px;
+      margin: 12px 0;
+      user-select: all;
+      transition: opacity 0.3s;
+    }
+
+    .pairing-code-value.stale {
+      opacity: 0.35;
+      text-decoration: line-through;
+      user-select: none;
+    }
+
+    .linklike-btn {
+      background: none;
+      border: none;
+      padding: 0;
+      color: var(--brand);
+      font-size: inherit;
+      text-decoration: underline;
+    }
+
     @media (max-width: 600px) {
       .onboard-shell { margin: 24px 16px; }
       .onboard-card { padding: 20px; }
       .result-grid { grid-template-columns: 1fr; }
+      .qr-display { padding: 12px; }
+      #qr-placeholder { width: 200px !important; height: 200px !important; }
+      .qr-display img { width: 200px; height: 200px; }
+      .pairing-section .phone-row { flex-direction: column; }
+      .pairing-section .phone-row .primary-btn { width: 100%; }
+      .pairing-code-value { font-size: 1.7rem; }
     }
   </style>
 </head>
@@ -149,8 +230,8 @@
             <div class="step-dot"></div>
             <div class="step-dot"></div>
           </div>
-          <h2>Scan with WhatsApp</h2>
-          <p class="status-message">Open WhatsApp → Linked Devices → Link a Device</p>
+          <h2 id="link-title">Scan with WhatsApp</h2>
+          <p class="status-message" id="link-subtitle">Open WhatsApp → Linked Devices → Link a Device</p>
           <div class="qr-display" id="qr-container">
             <div id="qr-placeholder" style="width:256px;height:256px;display:grid;place-items:center;color:#999;font-size:0.9rem">
               Generating QR code...
@@ -158,6 +239,27 @@
             <canvas id="qr-canvas" style="display:none"></canvas>
           </div>
           <p class="status-message loading" id="qr-status">Waiting for scan...</p>
+
+          <div class="link-divider" id="link-divider">or link with a pairing code</div>
+          <div class="pairing-section" id="pairing-section">
+            <div class="phone-row" id="pairing-form">
+              <input id="pairing-phone" type="tel" inputmode="numeric" autocomplete="tel"
+                placeholder="Phone with country code, e.g. 919876543210" />
+              <button class="primary-btn" id="pairing-get-btn" type="button">Get code</button>
+            </div>
+            <p class="status-message hidden" id="pairing-for">
+              Code for <strong id="pairing-for-phone"></strong> · <button class="linklike-btn" id="pairing-change-btn" type="button">change</button>
+            </p>
+            <div class="pairing-code-display hidden" id="pairing-code-display">
+              <div class="pairing-code-value" id="pairing-code-value"></div>
+              <p class="status-message" id="pairing-expiry"></p>
+              <div class="phone-row">
+                <button class="primary-btn" id="pairing-new-btn" type="button" style="flex:1">Get a new code</button>
+                <button class="primary-btn hidden" id="pairing-restart-btn" type="button" style="flex:1">Restart linking</button>
+              </div>
+            </div>
+            <p class="status-message error hidden" id="pairing-error"></p>
+          </div>
         </div>
 
         <!-- Step 2: Scanning -->
